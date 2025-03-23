@@ -152,7 +152,45 @@ class stock_web_module_data(metaclass=singleton_type):
             is_realtime=False,
             order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_STOCK_INDICATORS_SELL['name']}`.`code`) AS `cdatetime`",
             order_by=" `cdatetime` DESC"
+        ),wmd.web_module_data(
+            mode="query",
+            type="ETF指标数据",
+            ico="fa fa-indent",
+            name=tbs.TABLE_CN_ETF_INDICATORS['cn'],
+            table_name=tbs.TABLE_CN_ETF_INDICATORS['name'],
+            columns=tuple(tbs.TABLE_CN_ETF_INDICATORS['columns']),
+            column_names=tbs.get_field_cns(tbs.TABLE_CN_ETF_INDICATORS['columns']),
+            primary_key=[],
+            is_realtime=False,
+            order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_ETF_INDICATORS['name']}`.`code`) AS `cdatetime`",
+            order_by=" `cdatetime` DESC"
         ), wmd.web_module_data(
+            mode="query",
+            type="ETF指标数据",
+            ico="fa fa-indent",
+            name=tbs.TABLE_CN_ETF_INDICATORS_BUY['cn'],
+            table_name=tbs.TABLE_CN_ETF_INDICATORS_BUY['name'],
+            columns=tuple(tbs.TABLE_CN_ETF_INDICATORS_BUY['columns']),
+            column_names=tbs.get_field_cns(tbs.TABLE_CN_ETF_INDICATORS_BUY['columns']),
+            primary_key=[],
+            is_realtime=False,
+            order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_ETF_INDICATORS_BUY['name']}`.`code`) AS `cdatetime`",
+            order_by=" `cdatetime` DESC"
+        ), wmd.web_module_data(
+            mode="query",
+            type="ETF指标数据",
+            ico="fa fa-indent",
+            name=tbs.TABLE_CN_ETF_INDICATORS_SELL['cn'],
+            table_name=tbs.TABLE_CN_ETF_INDICATORS_SELL['name'],
+            columns=tuple(tbs.TABLE_CN_ETF_INDICATORS_SELL['columns']),
+            column_names=tbs.get_field_cns(tbs.TABLE_CN_ETF_INDICATORS_SELL['columns']),
+            primary_key=[],
+            is_realtime=False,
+            order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_ETF_INDICATORS_SELL['name']}`.`code`) AS `cdatetime`",
+            order_by=" `cdatetime` DESC"
+        ), 
+
+         wmd.web_module_data(
             mode="query",
             type="股票K线形态",
             ico="fa fa-tag",

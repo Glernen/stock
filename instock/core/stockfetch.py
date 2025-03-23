@@ -70,7 +70,7 @@ def fetch_stocks_trade_date():
     return None
 
 
-# 读取当天股票数据
+# 读取当天基金数据
 def fetch_etfs(date):
     try:
         data = fee.fund_etf_spot_em()
@@ -82,6 +82,7 @@ def fetch_etfs(date):
             data.insert(0, 'date', date.strftime("%Y-%m-%d"))
         data.columns = list(tbs.TABLE_CN_ETF_SPOT['columns'])
         data = data.loc[data['new_price'].apply(is_open)]
+        print(f"fetch_etfs.data：{data}")
         return data
     except Exception as e:
         logging.error(f"stockfetch.fetch_etfs处理异常：{e}")
@@ -241,7 +242,34 @@ def fetch_stock_blocktrade_data(date):
     return None
 
 
-# 读取股票历史数据
+# 读取基金历史数据
+def fetch_etf_hist(data_base, date_start=None, date_end=None, is_cache=True):
+    try:
+        # 解包数据
+        date, code = data_base[0], data_base[1]
+
+        # 获取 date_end
+        if date_start is None:
+            date_start, is_cache = trd.get_trade_hist_interval(date[0][0])
+            # date_start = date_start.strftime("%Y%m%d")
+
+        print(f"读取基金历史数据的时间： {date_start},{date_end}  ")
+        data = fee.fund_etf_hist_em(symbol=code, period="daily", start_date=date_start, end_date=date_end, adjust="qfq")
+        print(f"读取基金历史数据 {data} ")
+
+        if data is not None:
+            data.columns = tuple(tbs.CN_STOCK_HIST_DATA['columns'])
+            data = data.sort_index()  # 将数据按照日期排序
+            data.loc[:, 'p_change'] = tl.ROC(data['close'].values, 1)
+            data['p_change'].values[np.isnan(data['p_change'].values)] = 0.0
+            data["volume"] = data['volume'].values.astype('double') * 100  # 成交量单位从手变成股。
+
+        return data
+    except Exception as e:
+        logging.error(f"stockfetch.fetch_etf_hist处理异常：{e}")
+    return None
+
+"""
 def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
     date = data_base[0]
     code = data_base[1]
@@ -268,6 +296,7 @@ def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
         logging.error(f"stockfetch.fetch_etf_hist处理异常：{e}")
     return None
 
+"""
 
 # 读取股票历史数据
 def fetch_stock_hist(data_base, date_start=None, is_cache=True):

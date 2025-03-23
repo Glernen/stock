@@ -27,6 +27,7 @@ import strategy_data_daily_job as sdj
 import backtest_data_daily_job as bdj
 import klinepattern_data_daily_job as kdj
 import selection_data_daily_job as sddj
+import indicators_etf_data_daily_job as ieddj
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -47,6 +48,8 @@ def main():
         executor.submit(hdtj.main)
         # # 第3.2步创建股票指标数据表
         executor.submit(gdj.main)
+        # # 第3.3步创建ETF指标数据表
+        executor.submit(ieddj.main)
         # # # # 第4步创建股票k线形态表
         executor.submit(kdj.main)
         # # # # 第5步创建股票策略数据表
