@@ -272,7 +272,20 @@ TABLE_CN_STOCK_FOREIGN_KEY = {'name': 'cn_stock_foreign_key', 'cn': '股票外�
                                           'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
                                           'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
 
+TABLE_CN_ETF_FOREIGN_KEY = {'name': 'cn_etf_foreign_key', 'cn': '基金外键',
+                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
+                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
+                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
+
 TABLE_CN_STOCK_BACKTEST_DATA = {'name': 'cn_stock_backtest_data', 'cn': '股票回归测试数据',
+                                'columns': {'rate_%s' % i: {'type': FLOAT, 'cn': '%s日收益率' % i, 'size': 100} for i in
+                                            range(1, RATE_FIELDS_COUNT + 1, 1)}}
+
+TABLE_CN_ETF_BACKTEST_DATA = {'name': 'cn_etf_backtest_data', 'cn': 'ETF回归测试数据',
+                                'columns': {'rate_%s' % i: {'type': FLOAT, 'cn': '%s日收益率' % i, 'size': 100} for i in
+                                            range(1, RATE_FIELDS_COUNT + 1, 1)}}
+
+TABLE_CN_ETF_BACKTEST_DATA = {'name': 'cn_etf_backtest_data', 'cn': '基金回归测试数据',
                                 'columns': {'rate_%s' % i: {'type': FLOAT, 'cn': '%s日收益率' % i, 'size': 100} for i in
                                             range(1, RATE_FIELDS_COUNT + 1, 1)}}
 
@@ -367,8 +380,11 @@ TABLE_CN_STOCK_INDICATORS_SELL = {'name': 'cn_stock_indicators_sell', 'cn': '股
 
 
 TABLE_CN_ETF_INDICATORS = {'name': 'cn_etf_indicators', 'cn': 'ETF指标数据',
-                             'columns': TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()}
+                             'columns': TABLE_CN_ETF_FOREIGN_KEY['columns'].copy()}
 TABLE_CN_ETF_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
+
+_tmp_columns = TABLE_CN_ETF_FOREIGN_KEY['columns'].copy()
+_tmp_columns.update(TABLE_CN_ETF_BACKTEST_DATA['columns'])
 
 TABLE_CN_ETF_INDICATORS_BUY = {'name': 'cn_etf_indicators_buy', 'cn': 'ETF指标买入',
                                  'columns': _tmp_columns}

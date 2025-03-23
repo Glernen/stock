@@ -107,7 +107,7 @@ def guess_buy(date):
             return
 
         table_name = tbs.TABLE_CN_ETF_INDICATORS_BUY['name']
-        _columns_backtest = tuple(tbs.TABLE_CN_STOCK_BACKTEST_DATA['columns'])
+        _columns_backtest = tuple(tbs.TABLE_CN_ETF_BACKTEST_DATA['columns'])
         data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)])
 
         # 分批插入数据
@@ -140,7 +140,7 @@ def guess_sell(date):
             return
 
         table_name = tbs.TABLE_CN_ETF_INDICATORS_SELL['name']
-        _columns_backtest = tuple(tbs.TABLE_CN_STOCK_BACKTEST_DATA['columns'])
+        _columns_backtest = tuple(tbs.TABLE_CN_ETF_BACKTEST_DATA['columns'])
         data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)])
 
         # 分批插入数据
