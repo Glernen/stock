@@ -156,7 +156,7 @@ for cf in CN_STOCK_FUND_FLOW:
 
 CN_STOCK_SECTOR_FUND_FLOW = (('行业资金流', '概念资金流'),
                              ({'name': 'stock_sector_fund_flow_rank', 'cn': '今日',
-                              'columns': {'name': {'type': VARCHAR(30, _COLLATE), 'cn': '名称', 'size': 70},
+                              'columns': {'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
                                           'change_rate': {'type': FLOAT, 'cn': '今日涨跌幅', 'size': 70},
                                           'fund_amount': {'type': BIGINT, 'cn': '今日主力净流入-净额', 'size': 100},
                                           'fund_rate': {'type': FLOAT, 'cn': '今日主力净流入-净占比', 'size': 70},
@@ -364,6 +364,18 @@ TABLE_CN_STOCK_INDICATORS_BUY = {'name': 'cn_stock_indicators_buy', 'cn': '股�
 
 TABLE_CN_STOCK_INDICATORS_SELL = {'name': 'cn_stock_indicators_sell', 'cn': '股票指标卖出',
                                   'columns': _tmp_columns}
+
+
+TABLE_CN_ETF_INDICATORS = {'name': 'cn_etf_indicators', 'cn': 'ETF指标数据',
+                             'columns': TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()}
+TABLE_CN_ETF_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
+
+TABLE_CN_ETF_INDICATORS_BUY = {'name': 'cn_etf_indicators_buy', 'cn': 'ETF指标买入',
+                                 'columns': _tmp_columns}
+
+TABLE_CN_ETF_INDICATORS_SELL = {'name': 'cn_etf_indicators_sell', 'cn': 'ETF指标卖出',
+                                  'columns': _tmp_columns}
+
 
 TABLE_CN_STOCK_STRATEGIES = [
     {'name': 'cn_stock_strategy_enter', 'cn': '放量上涨', 'size': 70, 'func': enter.check_volume,

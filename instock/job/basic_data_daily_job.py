@@ -13,13 +13,16 @@ import instock.core.tablestructure as tbs
 import instock.lib.database as mdb
 import instock.core.stockfetch as stf
 from instock.core.singleton_stock import stock_data
+import pandas as pd
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
 
-
+'''
 # 股票实时行情数据。
+
 def save_nph_stock_spot_data(date, before=True):
+    logging.info(f"bddj.py股票实时行情数据，传入的日期参数: {date}")
     if before:
         return
     # 股票列表
@@ -41,7 +44,6 @@ def save_nph_stock_spot_data(date, before=True):
 
     except Exception as e:
         logging.error(f"basic_data_daily_job.save_stock_spot_data处理异常：{e}")
-
 
 # 基金实时行情数据。
 def save_nph_etf_spot_data(date, before=True):
@@ -65,6 +67,70 @@ def save_nph_etf_spot_data(date, before=True):
         mdb.insert_db_from_df(data, table_name, cols_type, False, "`date`,`code`")
     except Exception as e:
         logging.error(f"basic_data_daily_job.save_nph_etf_spot_data处理异常：{e}")
+
+'''
+def save_nph_stock_spot_data(date, before=True):
+    logging.info(f"bddj.py股票实时行情数据，传入的日期参数: {date}")
+    if before:
+        return
+    try:
+        data = stock_data(date).get_data()
+        if data is None or len(data.index) == 0:
+            return
+
+        table_name = tbs.TABLE_CN_STOCK_SPOT['name']
+        cols_type = tbs.get_field_types(tbs.TABLE_CN_STOCK_SPOT['columns'])
+
+        # 处理数据中的 nan 值，将其替换为 None
+        data = data.where(pd.notnull(data), None)
+
+        for index, row in data.iterrows():
+            columns = ', '.join(row.index)
+            placeholders = ', '.join(['%s'] * len(row))
+            insert_sql = f"INSERT INTO `{table_name}` ({columns}) VALUES ({placeholders})"
+            update_clause = ', '.join([f"`{col}` = VALUES(`{col}`)" for col in row.index if col not in ['date', 'code']])
+            upsert_sql = f"{insert_sql} ON DUPLICATE KEY UPDATE {update_clause}"
+            values = tuple(row)
+            try:
+                mdb.executeSql(upsert_sql, values)
+            except Exception as insert_error:
+                logging.error(f"插入 {row['code']} 数据时出错: {insert_error}")
+
+    except Exception as e:
+        logging.error(f"basic_data_daily_job.save_stock_spot_data处理异常：{e}")
+
+
+# 基金实时行情数据。
+def save_nph_etf_spot_data(date, before=True):
+    logging.info(f"bddj.py基金实时行情数据，传入的日期参数: {date}")
+    if before:
+        return
+    # 股票列表
+    try:
+        data = stf.fetch_etfs(date)
+        if data is None or len(data.index) == 0:
+            return
+
+        table_name = tbs.TABLE_CN_ETF_SPOT['name']
+        cols_type = tbs.get_field_types(tbs.TABLE_CN_ETF_SPOT['columns'])
+
+        # 处理数据中的 nan 值，将其替换为 None
+        data = data.where(pd.notnull(data), None)
+
+        for index, row in data.iterrows():
+            columns = ', '.join(row.index)
+            placeholders = ', '.join(['%s'] * len(row))
+            insert_sql = f"INSERT INTO `{table_name}` ({columns}) VALUES ({placeholders})"
+            update_clause = ', '.join([f"`{col}` = VALUES(`{col}`)" for col in row.index if col not in ['date', 'code']])
+            upsert_sql = f"{insert_sql} ON DUPLICATE KEY UPDATE {update_clause}"
+            values = tuple(row)
+            try:
+                mdb.executeSql(upsert_sql, values)
+            except Exception as insert_error:
+                logging.error(f"插入 {row['code']} 数据时出错: {insert_error}")
+
+    except Exception as e:
+        logging.error(f"basic_data_daily_job.save_nph_etf_spot_data处理异常：{e}")    
 
 
 def main():

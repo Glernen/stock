@@ -10,6 +10,10 @@ import pandas as pd
 from functools import lru_cache
 
 
+import requests
+import pandas as pd
+from functools import lru_cache
+
 def stock_zh_a_spot_em() -> pd.DataFrame:
     """
     东方财富网-沪深京 A 股-实时行情
@@ -18,11 +22,245 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
     :rtype: pandas.DataFrame
     """
     url = "http://82.push2.eastmoney.com/api/qt/clist/get"
+    # 初始请求参数，先获取总数据量和 page_size
     params = {
         "pn": "1",
-        "pz": "50000",
+        "pz": "1000",
         "po": "1",
         "np": "1",
+        "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        "fltt": "2",
+        "invt": "2",
+        "fid": "f3",
+        "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048",
+        "fields": "f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f14,f15,f16,f17,f18,f20,f21,f22,f23,f24,f25,f26,f37,f38,f39,f40,f41,f45,f46,f48,f49,f57,f61,f100,f112,f113,f114,f115,f221",
+        "_": "1623833739532",
+    }
+    try:
+        # 发送第一次请求获取总数据量和 page_size
+        r = requests.get(url, params=params)
+        r.raise_for_status()
+        data_json = r.json()
+        total = data_json["data"]["total"]
+        # 获取 page_size
+        page_size = len(data_json["data"]["diff"])
+        total_pages = (total + page_size - 1) // page_size
+
+        all_data = []
+        for page in range(1, total_pages + 1):
+            params["pn"] = str(page)
+            params["pz"] = str(page_size)
+            r = requests.get(url, params=params)
+            r.raise_for_status()
+            data_json = r.json()
+            if data_json["data"]["diff"]:
+                all_data.extend(data_json["data"]["diff"])
+
+        if not all_data:
+            return pd.DataFrame()
+
+        temp_df = pd.DataFrame(all_data)
+        temp_df.columns = [
+            "最新价",
+            "涨跌幅",
+            "涨跌额",
+            "成交量",
+            "成交额",
+            "振幅",
+            "换手率",
+            "市盈率动",
+            "量比",
+            "5分钟涨跌",
+            "代码",
+            "名称",
+            "最高",
+            "最低",
+            "今开",
+            "昨收",
+            "总市值",
+            "流通市值",
+            "涨速",
+            "市净率",
+            "60日涨跌幅",
+            "年初至今涨跌幅",
+            "上市时间",
+            "加权净资产收益率",
+            "总股本",
+            "已流通股份",
+            "营业收入",
+            "营业收入同比增长",
+            "归属净利润",
+            "归属净利润同比增长",
+            "每股未分配利润",
+            "毛利率",
+            "资产负债率",
+            "每股公积金",
+            "所处行业",
+            "每股收益",
+            "每股净资产",
+            "市盈率静",
+            "市盈率TTM",
+            "报告期"
+        ]
+        temp_df = temp_df[
+            [
+                "代码",
+                "名称",
+                "最新价",
+                "涨跌幅",
+                "涨跌额",
+                "成交量",
+                "成交额",
+                "振幅",
+                "换手率",
+                "量比",
+                "今开",
+                "最高",
+                "最低",
+                "昨收",
+                "涨速",
+                "5分钟涨跌",
+                "60日涨跌幅",
+                "年初至今涨跌幅",
+                "市盈率动",
+                "市盈率TTM",
+                "市盈率静",
+                "市净率",
+                "每股收益",
+                "每股净资产",
+                "每股公积金",
+                "每股未分配利润",
+                "加权净资产收益率",
+                "毛利率",
+                "资产负债率",
+                "营业收入",
+                "营业收入同比增长",
+                "归属净利润",
+                "归属净利润同比增长",
+                "报告期",
+                "总股本",
+                "已流通股份",
+                "总市值",
+                "流通市值",
+                "所处行业",
+                "上市时间"
+            ]
+        ]
+        # 批量转换数据类型
+        numeric_cols = [
+            "最新价", "涨跌幅", "涨跌额", "成交量", "成交额", "振幅", "换手率", "量比",
+            "最高", "最低", "今开", "昨收", "涨速", "5分钟涨跌", "60日涨跌幅", "年初至今涨跌幅",
+            "市盈率动", "市盈率TTM", "市盈率静", "市净率", "每股收益", "每股净资产",
+            "每股公积金", "每股未分配利润", "加权净资产收益率", "毛利率", "资产负债率",
+            "营业收入", "营业收入同比增长", "归属净利润", "归属净利润同比增长", "总股本",
+            "已流通股份", "总市值", "流通市值"
+        ]
+        temp_df[numeric_cols] = temp_df[numeric_cols].apply(pd.to_numeric, errors="coerce")
+
+        date_cols = ["报告期", "上市时间"]
+        temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))
+
+        return temp_df
+    except requests.RequestException as e:
+        print(f"请求出错: {e}")
+        return pd.DataFrame()
+    except KeyError as e:
+        print(f"解析数据出错: {e}")
+        return pd.DataFrame()
+
+
+@lru_cache()
+def code_id_map_em() -> dict:
+    """
+    东方财富-股票和市场代码
+    http://quote.eastmoney.com/center/gridlist.html#hs_a_board
+    :return: 股票和市场代码
+    :rtype: dict
+    """
+    url = "http://80.push2.eastmoney.com/api/qt/clist/get"
+    code_id_dict = {}
+
+    # 定义不同市场的参数配置
+    market_configs = [
+        {
+            "market_id": 1,
+            "fs": "m:1 t:2,m:1 t:23",
+            "column_name": "sh_code"
+        },
+        {
+            "market_id": 0,
+            "fs": "m:0 t:6,m:0 t:80",
+            "column_name": "sz_code"
+        },
+        {
+            "market_id": 0,
+            "fs": "m:0 t:81 s:2048",
+            "column_name": "bj_code"
+        }
+    ]
+
+    for config in market_configs:
+        # 先获取总数据量和 page_size
+        params = {
+            "pn": "1",
+            "pz": "1000",  # 可以设置一个较大的值来获取尽可能多的数据用于确定 page_size
+            "po": "1",
+            "np": "3",
+            "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+            "fltt": "2",
+            "invt": "2",
+            "fid": "f3",
+            "fs": config["fs"],
+            "fields": "f12",
+            "_": "1623833739532",
+        }
+        try:
+            r = requests.get(url, params=params)
+            r.raise_for_status()
+            data_json = r.json()
+            total = data_json["data"]["total"]
+            # 获取 page_size
+            page_size = len(data_json["data"]["diff"])
+            total_pages = (total + page_size - 1) // page_size
+
+            all_data = []
+            for page in range(1, total_pages + 1):
+                params["pn"] = str(page)
+                params["pz"] = str(page_size)
+                r = requests.get(url, params=params)
+                r.raise_for_status()
+                data_json = r.json()
+                if data_json["data"]["diff"]:
+                    all_data.extend(data_json["data"]["diff"])
+
+            if all_data:
+                temp_df = pd.DataFrame(all_data)
+                temp_df[config["column_name"]] = temp_df["f12"]
+                temp_df[f'{config["column_name"][:2]}_id'] = config["market_id"]
+                code_id_dict.update(dict(zip(temp_df[config["column_name"]], temp_df[f'{config["column_name"][:2]}_id'])))
+        except requests.RequestException as e:
+            print(f"请求出错: {e}")
+        except KeyError as e:
+            print(f"解析数据出错: {e}")
+
+    return code_id_dict
+
+
+
+"""
+def stock_zh_a_spot_em() -> pd.DataFrame:
+
+   # 东方财富网-沪深京 A 股-实时行情
+   # https://quote.eastmoney.com/center/gridlist.html#hs_a_board
+   # :return: 实时行情
+   # :rtype: pandas.DataFrame
+
+    url = "http://82.push2.eastmoney.com/api/qt/clist/get"
+    params = {
+        "pn": "1",
+        "pz": "10000",
+        "po": "1",
+        "np": "3",
         "ut": "bd1d9ddb04089700cf9c27f6f7426281",
         "fltt": "2",
         "invt": "2",
@@ -165,18 +403,18 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
 
 @lru_cache()
 def code_id_map_em() -> dict:
-    """
-    东方财富-股票和市场代码
-    http://quote.eastmoney.com/center/gridlist.html#hs_a_board
-    :return: 股票和市场代码
-    :rtype: dict
-    """
+
+   # 东方财富-股票和市场代码
+   # http://quote.eastmoney.com/center/gridlist.html#hs_a_board
+   # :return: 股票和市场代码
+   # :rtype: dict
+
     url = "http://80.push2.eastmoney.com/api/qt/clist/get"
     params = {
         "pn": "1",
-        "pz": "50000",
+        "pz": "10000",
         "po": "1",
-        "np": "1",
+        "np": "3",
         "ut": "bd1d9ddb04089700cf9c27f6f7426281",
         "fltt": "2",
         "invt": "2",
@@ -195,9 +433,9 @@ def code_id_map_em() -> dict:
     code_id_dict = dict(zip(temp_df["sh_code"], temp_df["sh_id"]))
     params = {
         "pn": "1",
-        "pz": "50000",
+        "pz": "10000",
         "po": "1",
-        "np": "1",
+        "np": "3",
         "ut": "bd1d9ddb04089700cf9c27f6f7426281",
         "fltt": "2",
         "invt": "2",
@@ -215,9 +453,9 @@ def code_id_map_em() -> dict:
     code_id_dict.update(dict(zip(temp_df_sz["f12"], temp_df_sz["sz_id"])))
     params = {
         "pn": "1",
-        "pz": "50000",
+        "pz": "10000",
         "po": "1",
-        "np": "1",
+        "np": "3",
         "ut": "bd1d9ddb04089700cf9c27f6f7426281",
         "fltt": "2",
         "invt": "2",
@@ -231,9 +469,12 @@ def code_id_map_em() -> dict:
     if not data_json["data"]["diff"]:
         return dict()
     temp_df_sz = pd.DataFrame(data_json["data"]["diff"])
+
     temp_df_sz["bj_id"] = 0
     code_id_dict.update(dict(zip(temp_df_sz["f12"], temp_df_sz["bj_id"])))
     return code_id_dict
+
+"""
 
 
 def stock_zh_a_hist(
@@ -503,12 +744,15 @@ def stock_zh_a_hist_pre_min_em(
 
 
 if __name__ == "__main__":
+    # 获取并打印沪深京 A 股实时行情数据
     stock_zh_a_spot_em_df = stock_zh_a_spot_em()
     print(stock_zh_a_spot_em_df)
 
+    # 获取并打印股票和市场代码映射
     code_id_map_em_df = code_id_map_em()
     print(code_id_map_em_df)
 
+    # 获取并打印指定股票的每日行情数据
     stock_zh_a_hist_df = stock_zh_a_hist(
         symbol="430090",
         period="daily",
@@ -518,20 +762,21 @@ if __name__ == "__main__":
     )
     print(stock_zh_a_hist_df)
 
+    # 获取并打印指定股票的每日分时行情数据
     stock_zh_a_hist_min_em_df = stock_zh_a_hist_min_em(symbol="833454", period="1")
     print(stock_zh_a_hist_min_em_df)
 
+    # 获取并打印指定股票的每日分时行情（包含盘前数据）
     stock_zh_a_hist_pre_min_em_df = stock_zh_a_hist_pre_min_em(symbol="833454")
     print(stock_zh_a_hist_pre_min_em_df)
 
-    stock_zh_a_spot_em_df = stock_zh_a_spot_em()
-    print(stock_zh_a_spot_em_df)
-
+    # 获取并打印指定股票的每日分时行情数据
     stock_zh_a_hist_min_em_df = stock_zh_a_hist_min_em(
         symbol="000001", period='1'
     )
     print(stock_zh_a_hist_min_em_df)
 
+    # 获取并打印指定股票的每日行情数据
     stock_zh_a_hist_df = stock_zh_a_hist(
         symbol="833454",
         period="daily",
@@ -540,4 +785,3 @@ if __name__ == "__main__":
         adjust="hfq",
     )
     print(stock_zh_a_hist_df)
-
