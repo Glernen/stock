@@ -26,9 +26,9 @@ def prepare(date):
     try:
         logging.info(f"ieddj.py基金行情数据，传入的日期参数: {date}")
         print(f"ieddj.py基金行情数据，传入的日期参数: {date}")
-        etfs_data = etf_hist_data(date=date).get_data()
+        # 强制重新获取数据
+        etfs_data = etf_hist_data(date=date, force_reload=True).get_data()
 
-        # print(f"ieddj.py基金行情数据，etfs_data：{etfs_data}")
         if etfs_data is None:
             return
         results = run_check(etfs_data, date=date)
