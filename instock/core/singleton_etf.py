@@ -57,7 +57,7 @@ class etf_hist_data(metaclass=singleton_type):
             _data = {}
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                    future_to_etf = {executor.submit(stf.fetch_etf_hist, etf, date_start, date_end, "False"): etf for etf in etfs}
+                    future_to_etf = {executor.submit(stf.fetch_etf_hist, etf, date_start, date_end, "qfq"): etf for etf in etfs}
                     for future in concurrent.futures.as_completed(future_to_etf):
                         etf = future_to_etf[future]
                         try:

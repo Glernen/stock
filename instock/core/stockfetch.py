@@ -243,6 +243,7 @@ def fetch_stock_blocktrade_data(date):
 
 
 # 读取基金历史数据
+"""
 def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
     try:
         # 解包数据
@@ -298,7 +299,7 @@ def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
         logging.error(f"stockfetch.fetch_etf_hist处理异常：{e}")
     return None
 
-"""
+
 
 # 读取股票历史数据
 def fetch_stock_hist(data_base, date_start=None, is_cache=True):
