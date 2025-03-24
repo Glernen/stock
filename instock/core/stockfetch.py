@@ -243,14 +243,14 @@ def fetch_stock_blocktrade_data(date):
 
 
 # 读取基金历史数据
-def fetch_etf_hist(data_base, date_start=None, date_end=None, is_cache=True):
+def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
     try:
         # 解包数据
         date, code = data_base[0], data_base[1]
 
         # 获取 date_end
         if date_start is None:
-            date_start, is_cache = trd.get_trade_hist_interval(date[0][0])
+            date_start, is_cache = trd.get_trade_hist_interval(date)
             # date_start = date_start.strftime("%Y%m%d")
 
         # print(f"读取基金历史数据的时间： {date_start},{date_end}  ")
