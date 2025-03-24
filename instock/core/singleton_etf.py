@@ -62,14 +62,14 @@ class etf_hist_data(metaclass=singleton_type):
                 for future in concurrent.futures.as_completed(future_to_etf):
                     etf = future_to_etf[future]
                     try:
-                        logging.info(f"开始获取 ETF {etf} 的历史数据")
+                        #logging.info(f"开始获取 ETF {etf} 的历史数据")
                         print(f"开始获取 ETF {etf} 的历史数据")
                         __data = future.result()
                         if __data is None:
-                            logging.warning(f"ETF {etf} 返回的数据为 None")
+                            #logging.warning(f"ETF {etf} 返回的数据为 None")
                             print(f"ETF {etf} 返回的数据为 None")
                         else:
-                            logging.info(f"成功获取 ETF {etf} 的数据")
+                            #logging.info(f"成功获取 ETF {etf} 的数据")
                             print(f"成功获取 ETF {etf} 的数据")
                             _data[etf] = __data
                     except Exception as e:
