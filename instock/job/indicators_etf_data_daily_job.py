@@ -21,54 +21,8 @@ from instock.core.singleton_etf import etf_hist_data
 __author__ = 'hqm'
 __date__ = '2025/3/23'
 
-def prepare(date):
-    try:
-        logging.info(f"ieddj.py基金行情数据，传入的日期参数: {date}")
-        print(f"ieddj.py基金行情数据，传入的日期参数: {date}")
-        etfs_data = etf_hist_data(date=date).get_data()
 
-        # print(f"ieddj.py基金行情数据，etfs_data：{etfs_data}")
-        if etfs_data is None:
-            return
-        
-        # 新增代码：将 etfs_data 的结果数据存储到 tbs.CN_STOCK_HIST_DATA['name'] 数据表中
-        table_name_etfs = tbs.CN_STOCK_HIST_DATA['name']
-        valid_etf_data = []
-        for etf_data in etfs_data.values():
-            # 假设这里检查 etf_data 是否是字典，并且包含预期的键
-            if isinstance(etf_data, dict) and set(tbs.CN_STOCK_HIST_DATA['columns']).issubset(etf_data.keys()):
-                valid_etf_data.append(etf_data)
-        df_etfs = pd.DataFrame(valid_etf_data) if valid_etf_data else pd.DataFrame()
-        df_etfs.columns = tuple(tbs.CN_STOCK_HIST_DATA['columns'])
-        chunksize = 1000  # 可以根据实际情况调整
-        df_etfs.to_sql(table_name_etfs, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
 
-        results = run_check(etfs_data, date=date)
-        if results is None:
-            return
-
-        table_name = tbs.TABLE_CN_ETF_INDICATORS['name']
-        dataKey = pd.DataFrame(results.keys())
-        _columns = tuple(tbs.TABLE_CN_ETF_FOREIGN_KEY['columns'])
-        dataKey.columns = _columns
-
-        dataVal = pd.DataFrame(results.values())
-        dataVal.drop('date', axis=1, inplace=True)  # 删除日期字段，然后和原始数据合并。
-
-        data = pd.merge(dataKey, dataVal, on=['code'], how='left')
-        # 单例，时间段循环必须改时间
-        date_str = date.strftime("%Y-%m-%d")
-        if date.strftime("%Y-%m-%d") != data.iloc[0]['date']:
-            data['date'] = date_str
-
-        # 分批插入数据
-        chunksize = 1000  # 可以根据实际情况调整
-        data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
-
-    except Exception as e:
-        logging.error(f"indicators_etf_data_daily_job.prepare处理异常：{e}")
-        print(f"indicators_etf_data_daily_job.prepare处理异常：{e}")
-"""
 def prepare(date):
     try:
         logging.info(f"ieddj.py基金行情数据，传入的日期参数: {date}")
@@ -103,7 +57,7 @@ def prepare(date):
     except Exception as e:
         logging.error(f"indicators_etf_data_daily_job.prepare处理异常：{e}")
         print(f"indicators_etf_data_daily_job.prepare处理异常：{e}")
-"""
+
 
 def run_check(stocks, date=None, workers=40):
     data = {}
