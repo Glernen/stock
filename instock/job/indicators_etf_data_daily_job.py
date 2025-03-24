@@ -32,6 +32,14 @@ def prepare(date):
         # print(f"ieddj.py基金行情数据，etfs_data：{etfs_data}")
         if etfs_data is None:
             return
+        
+        # 新增代码：将 etfs_data 的结果数据存储到 tbs.CN_STOCK_HIST_DATA['name'] 数据表中
+        table_name_etfs = tbs.CN_STOCK_HIST_DATA['name']
+        df_etfs = pd.DataFrame([etf_data for etf_data in etfs_data.values()]) if etfs_data else pd.DataFrame()
+        df_etfs.columns = tuple(tbs.CN_STOCK_HIST_DATA['columns'])
+        chunksize = 1000  # 可以根据实际情况调整
+        df_etfs.to_sql(table_name_etfs, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
+
         results = run_check(etfs_data, date=date)
         if results is None:
             return
