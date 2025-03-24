@@ -47,8 +47,8 @@ class etf_hist_data(metaclass=singleton_type):
             try:
                 date_start, is_cache = trd.get_trade_hist_interval(etfs[0][0])
                 date_end = date.strftime("%Y%m%d")
-                logging.info(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")
-                print(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")
+                # logging.info(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")
+                # print(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")
             except Exception as e:
                 logging.error(f"获取交易历史时间间隔时出错：{e}")
                 print(f"获取交易历史时间间隔时出错：{e}")
