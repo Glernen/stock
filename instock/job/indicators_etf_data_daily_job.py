@@ -7,6 +7,7 @@ import pandas as pd
 import os.path
 import sys
 from datetime import datetime, timedelta
+from threading import Lock
 
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
@@ -21,37 +22,43 @@ from instock.core.singleton_etf import etf_hist_data
 __author__ = 'hqm'
 __date__ = '2025/3/23'
 
+# 添加线程锁确保单例初始化安全
+singleton_lock = Lock()
 
 def prepare(date):
     try:
-        logging.info(f"ieddj.py基金行情数据，传入的日期参数: {date}")
-        print(f"ieddj.py基金行情数据，传入的日期参数: {date}")
-        # 强制重新获取数据
-        etfs_data = etf_hist_data(date=date, force_reload=True).get_data()
+        # 使用with语句确保线程安全
+        with singleton_lock:
+            logging.info(f"ieddj.py基金行情数据，传入的日期参数: {date}")
+            print(f"ieddj.py基金行情数据，传入的日期参数: {date}")
+            
+            # 强制重新获取数据
+            etfs_data = etf_hist_data(date=date, force_reload=True).get_data()
 
-        if etfs_data is None:
-            return
-        results = run_check(etfs_data, date=date)
-        if results is None:
-            return
+            if etfs_data is None:
+                return
+            
+            results = run_check(etfs_data, date=date)
+            if results is None:
+                return
 
-        table_name = tbs.TABLE_CN_ETF_INDICATORS['name']
-        dataKey = pd.DataFrame(results.keys())
-        _columns = tuple(tbs.TABLE_CN_ETF_FOREIGN_KEY['columns'])
-        dataKey.columns = _columns
+            table_name = tbs.TABLE_CN_ETF_INDICATORS['name']
+            dataKey = pd.DataFrame(results.keys())
+            _columns = tuple(tbs.TABLE_CN_ETF_FOREIGN_KEY['columns'])
+            dataKey.columns = _columns
 
-        dataVal = pd.DataFrame(results.values())
-        dataVal.drop('date', axis=1, inplace=True)  # 删除日期字段，然后和原始数据合并。
+            dataVal = pd.DataFrame(results.values())
+            dataVal.drop('date', axis=1, inplace=True)  # 删除日期字段，然后和原始数据合并。
 
-        data = pd.merge(dataKey, dataVal, on=['code'], how='left')
-        # 单例，时间段循环必须改时间
-        date_str = date.strftime("%Y-%m-%d")
-        if date.strftime("%Y-%m-%d") != data.iloc[0]['date']:
-            data['date'] = date_str
+            data = pd.merge(dataKey, dataVal, on=['code'], how='left')
+            # 单例，时间段循环必须改时间
+            date_str = date.strftime("%Y-%m-%d")
+            if date.strftime("%Y-%m-%d") != data.iloc[0]['date']:
+                data['date'] = date_str
 
-        # 分批插入数据
-        chunksize = 1000  # 可以根据实际情况调整
-        data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
+            # 分批插入数据
+            chunksize = 1000  # 可以根据实际情况调整
+            data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
 
     except Exception as e:
         logging.error(f"indicators_etf_data_daily_job.prepare处理异常：{e}")
@@ -66,9 +73,10 @@ def run_check(stocks, date=None, workers=40):
     data_column = columns
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            future_to_data = {executor.submit(idr.get_indicator, k, stocks[k], data_column, date=date): k for k in stocks}
-            for future in concurrent.futures.as_completed(future_to_data):
-                stock = future_to_data[future]
+            # 使用日期参数作为唯一键
+            futures = {executor.submit(idr.get_indicator, k, stocks[k], data_column, date=date): (k, date) for k in stocks}
+            for future in concurrent.futures.as_completed(futures):
+                stock, current_date = futures[future]
                 try:
                     _data_ = future.result()
                     if _data_ is not None:
@@ -151,6 +159,14 @@ def guess_sell(date):
 
 
 def main():
+    # 配置日志
+    logging.basicConfig(
+        filename='indicators_etf_data_daily_job.log',
+        level=logging.INFO,
+        format='%(asctime)s - %(levelname)s - %(message)s',
+        filemode='w'  # 每次运行清空日志
+    )
+
     if len(sys.argv) == 1:
         # 没有传入日期参数，使用当前日期
         date = datetime.now()
