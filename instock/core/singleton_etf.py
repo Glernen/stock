@@ -29,13 +29,13 @@ class etf_data(metaclass=singleton_type):
 
 # 读取基金历史数据
 class etf_hist_data(metaclass=singleton_type):
-    def __init__(self, date, etfs=None, workers=16, force_reload=False):
+    def __init__(self, date=None, etfs=None, workers=16, force_reload=False):
         if force_reload or not hasattr(self, 'data'):
             if etfs is None:
                 try:
                     _subset = etf_data(date).get_data()[list(tbs.TABLE_CN_ETF_FOREIGN_KEY['columns'])]
-                    # logging.info(f"singleton_etf.etf_hist_data._subset：{_subset}")
-                    # print(f"singleton_etf.etf_hist_data._subset：{_subset}")
+                    logging.info(f"singleton_etf.etf_hist_data._subset：{_subset}")
+                    print(f"singleton_etf.etf_hist_data._subset：{_subset}")
                     etfs = [tuple(x) for x in _subset.values]
                 except Exception as e:
                     logging.error(f"获取 _subset 数据时出错：{e}")
@@ -45,7 +45,7 @@ class etf_hist_data(metaclass=singleton_type):
                 self.data = None
                 return
             try:
-                date_start= trd.get_trade_hist_interval(etfs[0])
+                date_start, is_cache = trd.get_trade_hist_interval(etfs[0][0])
                 date_end = date.strftime("%Y%m%d")
                 # logging.info(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")
                 # print(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")
