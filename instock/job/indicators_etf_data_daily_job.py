@@ -1,12 +1,12 @@
 #!/usr/local/bin/python3
 # -*- coding: utf-8 -*-
 
-
 import logging
 import concurrent.futures
 import pandas as pd
 import os.path
 import sys
+from datetime import datetime, timedelta
 
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
@@ -20,7 +20,6 @@ from instock.core.singleton_etf import etf_hist_data
 
 __author__ = 'hqm'
 __date__ = '2025/3/23'
-
 
 
 def prepare(date):
@@ -94,7 +93,7 @@ def guess_buy(date):
 
         _columns = tuple(tbs.TABLE_CN_ETF_FOREIGN_KEY['columns'])
         _selcol = '`,`'.join(_columns)
-        
+
         sql = f'''SELECT `{_selcol}` FROM `{_table_name}` WHERE `date` = '{date}' and
                 `kdjj` <= 0 and `rsi_6` <= 30 and
                 `cci` <= -130 and `rsi_12` <= 45 and `close` <= `boll_lb` and
@@ -152,11 +151,36 @@ def guess_sell(date):
 
 
 def main():
-    # 使用方法传递。
-    runt.run_with_args(prepare)
-    # 二次筛选数据。直接计算买卖股票数据。
-    runt.run_with_args(guess_buy)
-    runt.run_with_args(guess_sell)
+    if len(sys.argv) == 1:
+        # 没有传入日期参数，使用当前日期
+        date = datetime.now()
+        dates = [date]
+    elif len(sys.argv) == 2:
+        # 传入单个日期
+        date_str = sys.argv[1]
+        date = datetime.strptime(date_str, "%Y-%m-%d")
+        dates = [date]
+    elif len(sys.argv) == 3:
+        # 传入日期区间
+        start_date_str = sys.argv[1]
+        end_date_str = sys.argv[2]
+        start_date = datetime.strptime(start_date_str, "%Y-%m-%d")
+        end_date = datetime.strptime(end_date_str, "%Y-%m-%d")
+        dates = []
+        current_date = start_date
+        while current_date <= end_date:
+            dates.append(current_date)
+            current_date += timedelta(days=1)
+    else:
+        print("参数格式错误，请使用以下格式：")
+        print("单个日期：python indicators_etf_data_daily_job.py 2024-04-02")
+        print("日期区间：python indicators_etf_data_daily_job.py 2024-04-02 2024-04-05")
+        return
+
+    for date in dates:
+        prepare(date)
+        guess_buy(date)
+        guess_sell(date)
 
 
 # main函数入口
