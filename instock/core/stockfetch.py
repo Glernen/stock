@@ -253,16 +253,18 @@ def fetch_etf_hist(data_base, date_start=None, date_end=None, is_cache=True):
             date_start, is_cache = trd.get_trade_hist_interval(date[0][0])
             # date_start = date_start.strftime("%Y%m%d")
 
-        print(f"读取基金历史数据的时间： {date_start},{date_end}  ")
+        # print(f"读取基金历史数据的时间： {date_start},{date_end}  ")
         data = fee.fund_etf_hist_em(symbol=code, period="daily", start_date=date_start, end_date=date_end, adjust="qfq")
-        print(f"读取基金历史数据 {data} ")
-
-        if data is not None:
+        # print(f"读取基金历史数据 {data} ")
+        '''在给 DataFrame 赋列名之前，先检查 DataFrame 是否为空。如果为空，则直接返回 None 或者一个空的 DataFrame，避免赋值列名操作引发错误。'''
+        if data is not None and not data.empty:  # 检查 DataFrame 是否为空
             data.columns = tuple(tbs.CN_STOCK_HIST_DATA['columns'])
             data = data.sort_index()  # 将数据按照日期排序
             data.loc[:, 'p_change'] = tl.ROC(data['close'].values, 1)
             data['p_change'].values[np.isnan(data['p_change'].values)] = 0.0
             data["volume"] = data['volume'].values.astype('double') * 100  # 成交量单位从手变成股。
+        else:
+            return None  # 如果数据为空，直接返回 None
 
         return data
     except Exception as e:
