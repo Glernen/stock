@@ -63,9 +63,9 @@ class etf_hist_data(metaclass=singleton_type):
                         try:
                             __data = future.result()
                             if __data is None:
-                                print(f"ETF {etf} 返回的数据为 None")
+                                # print(f"ETF {etf} 返回的数据为 None")
                             else:
-                                print(f"成功获取 ETF {etf} 的数据")
+                                # print(f"成功获取 ETF {etf} 的数据")
                                 _data[etf] = __data
                         except Exception as e:
                             logging.error(f"获取 ETF {etf} 数据时出错: {e}")
