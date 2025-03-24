@@ -35,7 +35,7 @@ def prepare(date):
             # 强制重新获取数据
             etfs_data = etf_hist_data(date=date, force_reload=True).get_data()
 
-            rint(f"当前获取到etfs_data：{date},{etfs_data}")
+            print(f"当前获取到etfs_data：{date},{etfs_data}")
 
             if etfs_data is None:
                 return

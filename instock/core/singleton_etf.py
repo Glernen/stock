@@ -19,8 +19,8 @@ class etf_data(metaclass=singleton_type):
     def __init__(self, date):
         try:
             self.data = stf.fetch_etfs(date)
-            logging.info(f"成功获取 {date} 的基金数据")
-            print(f"成功获取 {date} 的基金数据")
+            # ogging.info(f"成功获取 {date} 的基金数据")
+            # print(f"成功获取 {date} 的基金数据")
         except Exception as e:
             logging.error(f"singleton_etf.etf_data处理异常：{e}")
 
@@ -57,7 +57,7 @@ class etf_hist_data(metaclass=singleton_type):
             _data = {}
             try:
                 with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                    future_to_etf = {executor.submit(stf.fetch_etf_hist, etf, date_start, date_end, is_cache): etf for etf in etfs}
+                    future_to_etf = {executor.submit(stf.fetch_etf_hist, etf, date_start, date_end, "False"): etf for etf in etfs}
                     for future in concurrent.futures.as_completed(future_to_etf):
                         etf = future_to_etf[future]
                         try:
