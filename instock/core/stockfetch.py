@@ -71,52 +71,44 @@ def fetch_stocks_trade_date():
     return None
 
 
+"""
 # 读取当天基金数据并插入数据库
 def fetch_etfs(date):
     try:
-        # 1. 获取原始数据
         data = fee.fund_etf_spot_em()
         if data is None or len(data.index) == 0:
-            logging.error(f"fetch_etfs: 未获取到基金数据，日期: {date}")
+            logging.error(f"数据源返回空值，日期: {date}")
             return None
-
-        # 2. 插入日期字段
-        date_str = date.strftime("%Y-%m-%d") if date else datetime.datetime.now().strftime("%Y-%m-%d")
-        data.insert(0, 'date', date_str)
-
-        # 3. 列名标准化
-        data.columns = list(tbs.TABLE_CN_ETF_SPOT['columns'])
-
-        # 4. 过滤未开盘的数据
-        data = data.loc[data['new_price'].apply(is_open)]
-
-        # 5. 存储到数据库
-        table_name = tbs.TABLE_CN_ETF_SPOT['name']
-        if not data.empty:
-            # 先删除当天的数据，避免重复
-            with mdb.engine().begin() as conn:
-                delete_sql = f"DELETE FROM `{table_name}` WHERE `date` = '{date_str}'"
-                conn.execute(delete_sql)
-                
-            # 批量插入新数据
-            data.to_sql(
-                name=table_name,
-                con=mdb.engine(),
-                if_exists='append',
-                index=False,
-                chunksize=1000
-            )
-            logging.info(f"成功存储 {date_str} 的基金数据到表 {table_name}")
-            print(f"成功存储 {date_str} 的基金数据到表 {table_name}")
+        if date is None:
+            data.insert(0, 'date', datetime.datetime.now().strftime("%Y-%m-%d"))
         else:
-            logging.warning(f"基金数据为空，未存储到数据库，日期: {date_str}")
+            data.insert(0, 'date', date.strftime("%Y-%m-%d"))
+        data.columns = list(tbs.TABLE_CN_ETF_SPOT['columns'])
+        __data = data.loc[data['new_price'].apply(is_open)]
 
-        print(f"fetch_etfs.data：{data}")
-        return data
+        table_name = tbs.TABLE_CN_ETF_SPOT['name']
+        cols_type = tbs.get_field_types(tbs.TABLE_CN_ETF_SPOT['columns'])
 
+        # 处理数据中的 nan 值，将其替换为 None
+        data = data.where(pd.notnull(__data), None)
+
+        for index, row in data.iterrows():
+            columns = ', '.join(row.index)
+            placeholders = ', '.join(['%s'] * len(row))
+            insert_sql = f"INSERT INTO `{table_name}` ({columns}) VALUES ({placeholders})"
+            update_clause = ', '.join([f"`{col}` = VALUES(`{col}`)" for col in row.index if col not in ['date', 'code']])
+            upsert_sql = f"{insert_sql} ON DUPLICATE KEY UPDATE {update_clause}"
+            values = tuple(row)
+            try:
+                mdb.executeSql(upsert_sql, values)
+            except Exception as insert_error:
+                logging.error(f"插入 {row['code']} 数据时出错: {insert_error}")
+
+        # print(f"fetch_etfs.data：{data}")
+        return __data
     except Exception as e:
         logging.error(f"stockfetch.fetch_etfs处理异常：{e}")
-        return None
+    return None
 
 """
 def fetch_etfs(date):
@@ -135,7 +127,7 @@ def fetch_etfs(date):
     except Exception as e:
         logging.error(f"stockfetch.fetch_etfs处理异常：{e}")
     return None
-"""
+
 
 
 # 读取当天股票数据
