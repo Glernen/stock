@@ -64,21 +64,22 @@ def prepare(date):
 
             # 处理NaN值
             data = data.where(pd.notnull(data), None)
-            values = [tuple(row) for row in data.values]
 
-            # 构建批量UPSERT语句
-            columns = ', '.join(data.columns)
-            placeholders = ', '.join(['%s'] * len(data.columns))
-            insert_sql = f"INSERT INTO `{table_name}` ({columns}) VALUES ({placeholders})"
-            update_clause = ', '.join([f"`{col}` = VALUES(`{col}`)" for col in data.columns if col not in ['date', 'code']])
-            upsert_sql = f"{insert_sql} ON DUPLICATE KEY UPDATE {update_clause}"
+            # 先删除当天的旧数据
+            with mdb.engine().begin() as conn:
+                delete_sql = text(f"DELETE FROM `{table_name}` WHERE `date` = :date")
+                conn.execute(delete_sql, {"date": date_str})
 
-            # 执行批量插入
-            try:
-                mdb.executeManySql(upsert_sql, values)
-                logging.info(f"成功插入/更新 {date_str} 的 {len(values)} 条基金指标数据")
-            except Exception as e:
-                logging.error(f"插入数据时出错: {e}")
+            # 分批插入数据
+            chunksize = 1000  # 可以根据实际情况调整
+            data.to_sql(
+                name=table_name,
+                con=mdb.engine(),
+                if_exists='append',
+                index=False,
+                chunksize=chunksize
+            )
+            logging.info(f"成功插入 {date_str} 的 {len(data)} 条基金指标数据")
 
     except Exception as e:
         logging.error(f"indicators_etf_data_daily_job.prepare处理异常：{e}")
@@ -113,6 +114,8 @@ def run_check(stocks, date=None, workers=40):
 
 # 对每日指标数据，进行筛选。将符合条件的。二次筛选出来。
 # 只是做简单筛选
+# 对每日指标数据，进行筛选。将符合条件的。二次筛选出来。
+# 只是做简单筛选
 def guess_buy(date):
     try:
         _table_name = tbs.TABLE_CN_ETF_INDICATORS['name']
@@ -137,9 +140,16 @@ def guess_buy(date):
         _columns_backtest = tuple(tbs.TABLE_CN_ETF_BACKTEST_DATA['columns'])
         data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)])
 
+        # 先删除当天的旧数据
+        date_str = date.strftime("%Y-%m-%d")
+        with mdb.engine().begin() as conn:
+            delete_sql = text(f"DELETE FROM `{table_name}` WHERE `date` = :date")
+            conn.execute(delete_sql, {"date": date_str})
+
         # 分批插入数据
         chunksize = 1000  # 可以根据实际情况调整
         data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
+        logging.info(f"成功插入 {date_str} 的 {len(data)} 条基金买入指标数据")
 
     except Exception as e:
         logging.error(f"indicators_etf_data_daily_job.guess_buy处理异常：{e}")
@@ -170,12 +180,20 @@ def guess_sell(date):
         _columns_backtest = tuple(tbs.TABLE_CN_ETF_BACKTEST_DATA['columns'])
         data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)])
 
+        # 先删除当天的旧数据
+        date_str = date.strftime("%Y-%m-%d")
+        with mdb.engine().begin() as conn:
+            delete_sql = text(f"DELETE FROM `{table_name}` WHERE `date` = :date")
+            conn.execute(delete_sql, {"date": date_str})
+
         # 分批插入数据
         chunksize = 1000  # 可以根据实际情况调整
         data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
+        logging.info(f"成功插入 {date_str} 的 {len(data)} 条基金卖出指标数据")
 
     except Exception as e:
         logging.error(f"indicators_etf_data_daily_job.guess_sell处理异常：{e}")
+
 
 
 def main():
