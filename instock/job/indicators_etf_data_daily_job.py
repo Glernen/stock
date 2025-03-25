@@ -40,8 +40,6 @@ def prepare(date):
             
             # 强制重新获取数据（确保 force_reload=True）
             etfs_data = etf_hist_data(date=date, force_reload=True).get_data()
-            print(f"当前获取到etfs_data：{date},{etfs_data}")
-
             if etfs_data is None:
                 logging.error(f"无法获取 {date} 的基金数据")
                 return
@@ -60,14 +58,27 @@ def prepare(date):
             dataVal.drop('date', axis=1, inplace=True)  # 删除日期字段，然后和原始数据合并。
 
             data = pd.merge(dataKey, dataVal, on=['code'], how='left')
-            # 单例，时间段循环必须改时间
             date_str = date.strftime("%Y-%m-%d")
             if date.strftime("%Y-%m-%d") != data.iloc[0]['date']:
                 data['date'] = date_str
 
-            # 分批插入数据
-            chunksize = 1000  # 可以根据实际情况调整
-            data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
+            # 处理NaN值
+            data = data.where(pd.notnull(data), None)
+            values = [tuple(row) for row in data.values]
+
+            # 构建批量UPSERT语句
+            columns = ', '.join(data.columns)
+            placeholders = ', '.join(['%s'] * len(data.columns))
+            insert_sql = f"INSERT INTO `{table_name}` ({columns}) VALUES ({placeholders})"
+            update_clause = ', '.join([f"`{col}` = VALUES(`{col}`)" for col in data.columns if col not in ['date', 'code']])
+            upsert_sql = f"{insert_sql} ON DUPLICATE KEY UPDATE {update_clause}"
+
+            # 执行批量插入
+            try:
+                mdb.executeManySql(upsert_sql, values)
+                logging.info(f"成功插入/更新 {date_str} 的 {len(values)} 条基金指标数据")
+            except Exception as e:
+                logging.error(f"插入数据时出错: {e}")
 
     except Exception as e:
         logging.error(f"indicators_etf_data_daily_job.prepare处理异常：{e}")
