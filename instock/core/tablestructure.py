@@ -94,17 +94,10 @@ TABLE_CN_INDEX_SPOT = {'name': 'cn_index_spot', 'cn': '每日指数数据',
                                    'ups_downs': {'type': FLOAT, 'cn': '涨跌额', 'size': 70},
                                    'volume': {'type': BIGINT, 'cn': '成交量', 'size': 90},
                                    'deal_amount': {'type': BIGINT, 'cn': '成交额', 'size': 100},
-                                   'amplitude': {'type': FLOAT, 'cn': '振幅', 'size': 70},
-                                   'turnoverrate': {'type': FLOAT, 'cn': '换手率', 'size': 70},
-                                   'volume_ratio': {'type': FLOAT, 'cn': '量比', 'size': 70},
                                    'open_price': {'type': FLOAT, 'cn': '今开', 'size': 70},
                                    'high_price': {'type': FLOAT, 'cn': '最高', 'size': 70},
                                    'low_price': {'type': FLOAT, 'cn': '最低', 'size': 70},
-                                   'pre_close_price': {'type': FLOAT, 'cn': '昨收', 'size': 70},
-                                   'speed_increase': {'type': FLOAT, 'cn': '涨速', 'size': 70},
-                                   'speed_increase_5': {'type': FLOAT, 'cn': '5分钟涨跌', 'size': 70},
-                                   'speed_increase_60': {'type': FLOAT, 'cn': '60日涨跌幅', 'size': 70},
-                                   'speed_increase_all': {'type': FLOAT, 'cn': '年初至今涨跌幅', 'size': 70}}}
+                                   'pre_close_price': {'type': FLOAT, 'cn': '昨收', 'size': 70}}}
 
 TABLE_CN_STOCK_SPOT_BUY = {'name': 'cn_stock_spot_buy', 'cn': '基本面选股',
                            'columns': TABLE_CN_STOCK_SPOT['columns'].copy()}
