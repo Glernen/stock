@@ -17,7 +17,8 @@ import instock.core.tablestructure as tbs
 import instock.lib.database as mdb
 import instock.core.indicator.calculate_indicator as idr
 from instock.core.singleton_stock import stock_hist_data
-from instock.core.singleton_etf import etf_hist_data
+# from instock.core.singleton_etf import etf_hist_data
+from instock.core.singleton_etf import etf_data, etf_hist_data
 
 __author__ = 'hqm'
 __date__ = '2025/3/23'

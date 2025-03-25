@@ -36,7 +36,7 @@ class etf_hist_data(metaclass=singleton_type):
                 try:
                     print(f"etf_hist_data 使用的日期: {date}")
                     _subset = etf_data(date).get_data()[list(tbs.TABLE_CN_ETF_FOREIGN_KEY['columns'])]
-                    logging.info(f"singleton_etf.etf_hist_data._subset：{_subset}")
+                    # logging.info(f"singleton_etf.etf_hist_data._subset：{_subset}")
                     print(f"singleton_etf.etf_hist_data._subset：{_subset}")
                     etfs = [tuple(x) for x in _subset.values]
                 except Exception as e:

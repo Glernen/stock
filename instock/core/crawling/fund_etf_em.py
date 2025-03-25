@@ -214,12 +214,12 @@ def fund_etf_hist_em(
         "_": "1623766962675",
     }
     try:
-        logging.info(f"请求 {symbol} 历史数据，参数：{params}")
+        # logging.info(f"请求 {symbol} 历史数据，参数：{params}")
         r = requests.get(url, params=params)
         r.raise_for_status()
         data_json = r.json()
         if not (data_json["data"] and data_json["data"]["klines"]):
-            logging.info(f"未获取到 {symbol} 从 {start_date} 到 {end_date} 的历史数据，响应数据：{data_json}")
+            # logging.info(f"未获取到 {symbol} 从 {start_date} 到 {end_date} 的历史数据，响应数据：{data_json}")
             return pd.DataFrame()
         temp_df = pd.DataFrame([item.split(",") for item in data_json["data"]["klines"]])
         temp_df.columns = [
