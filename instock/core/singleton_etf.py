@@ -18,6 +18,7 @@ logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %
 class etf_data(metaclass=singleton_type):
     def __init__(self, date):
         try:
+            print(f"etf_data 使用的日期: {date}")
             self.data = stf.fetch_etfs(date)
             # ogging.info(f"成功获取 {date} 的基金数据")
             # print(f"成功获取 {date} 的基金数据")
@@ -33,6 +34,7 @@ class etf_hist_data(metaclass=singleton_type):
         if force_reload or not hasattr(self, 'data'):
             if etfs is None:
                 try:
+                    print(f"etf_hist_data 使用的日期: {date}")
                     _subset = etf_data(date).get_data()[list(tbs.TABLE_CN_ETF_FOREIGN_KEY['columns'])]
                     logging.info(f"singleton_etf.etf_hist_data._subset：{_subset}")
                     print(f"singleton_etf.etf_hist_data._subset：{_subset}")
@@ -45,7 +47,7 @@ class etf_hist_data(metaclass=singleton_type):
                 self.data = None
                 return
             try:
-                date_start, is_cache = trd.get_trade_hist_interval(etfs[0][0])
+                date_start, is_cache = trd.get_trade_hist_interval(etfs[0][0])  # 提高运行效率，只运行一次
                 date_end = date.strftime("%Y%m%d")
                 # logging.info(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")
                 # print(f"trd.get_trade_hist_interval 返回值: date_start={date_start}, is_cache={is_cache}")

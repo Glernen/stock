@@ -27,21 +27,27 @@ singleton_lock = Lock()
 
 def prepare(date):
     try:
-        # 使用with语句确保线程安全
+        # 强制删除单例实例，确保每次处理新日期时重新初始化
+        if hasattr(etf_hist_data, "_instance"):
+            del etf_hist_data._instance
+        if hasattr(etf_data, "_instance"):
+            del etf_data._instance
+
         with singleton_lock:
             logging.info(f"ieddj.py基金行情数据，传入的日期参数: {date}")
             print(f"ieddj.py基金行情数据，传入的日期参数: {date}")
             
-            # 强制重新获取数据
+            # 强制重新获取数据（确保 force_reload=True）
             etfs_data = etf_hist_data(date=date, force_reload=True).get_data()
-
             print(f"当前获取到etfs_data：{date},{etfs_data}")
 
             if etfs_data is None:
+                logging.error(f"无法获取 {date} 的基金数据")
                 return
             
             results = run_check(etfs_data, date=date)
             if results is None:
+                logging.error(f"未找到 {date} 的基金指标数据")
                 return
 
             table_name = tbs.TABLE_CN_ETF_INDICATORS['name']
@@ -166,7 +172,7 @@ def main():
         filename='indicators_etf_data_daily_job.log',
         level=logging.INFO,
         format='%(asctime)s - %(levelname)s - %(message)s',
-        filemode='w'  # 每次运行清空日志
+        filemode='a'  # 每次运行清空日志
     )
 
     if len(sys.argv) == 1:
