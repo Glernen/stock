@@ -6,7 +6,8 @@ import os
 import pymysql
 from sqlalchemy import create_engine
 from sqlalchemy.types import NVARCHAR
-from sqlalchemy import inspect
+from sqlalchemy import inspect,text
+
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '

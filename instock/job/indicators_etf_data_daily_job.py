@@ -19,6 +19,7 @@ import instock.core.indicator.calculate_indicator as idr
 from instock.core.singleton_stock import stock_hist_data
 # from instock.core.singleton_etf import etf_hist_data
 from instock.core.singleton_etf import etf_data, etf_hist_data
+from sqlalchemy import text
 
 __author__ = 'hqm'
 __date__ = '2025/3/23'
@@ -112,8 +113,6 @@ def run_check(stocks, date=None, workers=40):
         return data
 
 
-# 对每日指标数据，进行筛选。将符合条件的。二次筛选出来。
-# 只是做简单筛选
 # 对每日指标数据，进行筛选。将符合条件的。二次筛选出来。
 # 只是做简单筛选
 def guess_buy(date):
