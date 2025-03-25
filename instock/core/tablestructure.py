@@ -383,14 +383,14 @@ TABLE_CN_ETF_INDICATORS = {'name': 'cn_etf_indicators', 'cn': 'ETF指标数据',
                              'columns': TABLE_CN_ETF_FOREIGN_KEY['columns'].copy()}
 TABLE_CN_ETF_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
 
-_tmp_columns = TABLE_CN_ETF_FOREIGN_KEY['columns'].copy()
-_tmp_columns.update(TABLE_CN_ETF_BACKTEST_DATA['columns'])
+__tmp_columns = TABLE_CN_ETF_FOREIGN_KEY['columns'].copy()
+__tmp_columns.update(TABLE_CN_ETF_BACKTEST_DATA['columns'])
 
 TABLE_CN_ETF_INDICATORS_BUY = {'name': 'cn_etf_indicators_buy', 'cn': 'ETF指标买入',
-                                 'columns': _tmp_columns}
+                                 'columns': __tmp_columns}
 
 TABLE_CN_ETF_INDICATORS_SELL = {'name': 'cn_etf_indicators_sell', 'cn': 'ETF指标卖出',
-                                  'columns': _tmp_columns}
+                                  'columns': __tmp_columns}
 
 
 TABLE_CN_STOCK_STRATEGIES = [
