@@ -85,6 +85,27 @@ TABLE_CN_STOCK_SPOT = {'name': 'cn_stock_spot', 'cn': '每日股票数据',
                                    'industry': {'type': VARCHAR(20, _COLLATE), 'cn': '所处行业', 'size': 100},
                                    'listing_date': {'type': DATE, 'cn': '上市时间', 'size': 110}}}
 
+TABLE_CN_INDEX_SPOT = {'name': 'cn_index_spot', 'cn': '每日指数数据',
+                       'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
+                                   'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
+                                   'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
+                                   'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70},
+                                   'change_rate': {'type': FLOAT, 'cn': '涨跌幅', 'size': 70},
+                                   'ups_downs': {'type': FLOAT, 'cn': '涨跌额', 'size': 70},
+                                   'volume': {'type': BIGINT, 'cn': '成交量', 'size': 90},
+                                   'deal_amount': {'type': BIGINT, 'cn': '成交额', 'size': 100},
+                                   'amplitude': {'type': FLOAT, 'cn': '振幅', 'size': 70},
+                                   'turnoverrate': {'type': FLOAT, 'cn': '换手率', 'size': 70},
+                                   'volume_ratio': {'type': FLOAT, 'cn': '量比', 'size': 70},
+                                   'open_price': {'type': FLOAT, 'cn': '今开', 'size': 70},
+                                   'high_price': {'type': FLOAT, 'cn': '最高', 'size': 70},
+                                   'low_price': {'type': FLOAT, 'cn': '最低', 'size': 70},
+                                   'pre_close_price': {'type': FLOAT, 'cn': '昨收', 'size': 70},
+                                   'speed_increase': {'type': FLOAT, 'cn': '涨速', 'size': 70},
+                                   'speed_increase_5': {'type': FLOAT, 'cn': '5分钟涨跌', 'size': 70},
+                                   'speed_increase_60': {'type': FLOAT, 'cn': '60日涨跌幅', 'size': 70},
+                                   'speed_increase_all': {'type': FLOAT, 'cn': '年初至今涨跌幅', 'size': 70}}}
+
 TABLE_CN_STOCK_SPOT_BUY = {'name': 'cn_stock_spot_buy', 'cn': '基本面选股',
                            'columns': TABLE_CN_STOCK_SPOT['columns'].copy()}
 
@@ -267,15 +288,6 @@ CN_STOCK_HIST_DATA = {'name': 'fund_etf_hist_em', 'cn': '基金某时间段的�
                                   'ups_downs': {'type': FLOAT, 'cn': '涨跌额'},
                                   'turnover': {'type': FLOAT, 'cn': '换手率'}}}
 
-TABLE_CN_STOCK_FOREIGN_KEY = {'name': 'cn_stock_foreign_key', 'cn': '股票外键',
-                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
-
-TABLE_CN_ETF_FOREIGN_KEY = {'name': 'cn_etf_foreign_key', 'cn': '基金外键',
-                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
 
 TABLE_CN_STOCK_BACKTEST_DATA = {'name': 'cn_stock_backtest_data', 'cn': '股票回归测试数据',
                                 'columns': {'rate_%s' % i: {'type': FLOAT, 'cn': '%s日收益率' % i, 'size': 100} for i in
@@ -285,7 +297,7 @@ TABLE_CN_ETF_BACKTEST_DATA = {'name': 'cn_etf_backtest_data', 'cn': 'ETF回归�
                                 'columns': {'rate_%s' % i: {'type': FLOAT, 'cn': '%s日收益率' % i, 'size': 100} for i in
                                             range(1, RATE_FIELDS_COUNT + 1, 1)}}
 
-TABLE_CN_ETF_BACKTEST_DATA = {'name': 'cn_etf_backtest_data', 'cn': '基金回归测试数据',
+TABLE_CN_INDEX_BACKTEST_DATA = {'name': 'cn_index_backtest_data', 'cn': '指数回归测试数据',
                                 'columns': {'rate_%s' % i: {'type': FLOAT, 'cn': '%s日收益率' % i, 'size': 100} for i in
                                             range(1, RATE_FIELDS_COUNT + 1, 1)}}
 
@@ -365,6 +377,11 @@ STOCK_STATS_DATA = {'name': 'calculate_indicator', 'cn': '股票统计/指标计
                                 'stochrsi_k': {'type': FLOAT, 'cn': 'stochrsi_k', 'size': 70},
                                 'stochrsi_d': {'type': FLOAT, 'cn': 'stochrsi_d', 'size': 70}}}
 
+TABLE_CN_STOCK_FOREIGN_KEY = {'name': 'cn_stock_foreign_key', 'cn': '股票外键',
+                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
+                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
+                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
+
 TABLE_CN_STOCK_INDICATORS = {'name': 'cn_stock_indicators', 'cn': '股票指标数据',
                              'columns': TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()}
 TABLE_CN_STOCK_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
@@ -378,6 +395,12 @@ TABLE_CN_STOCK_INDICATORS_BUY = {'name': 'cn_stock_indicators_buy', 'cn': '股�
 TABLE_CN_STOCK_INDICATORS_SELL = {'name': 'cn_stock_indicators_sell', 'cn': '股票指标卖出',
                                   'columns': _tmp_columns}
 
+# ETF数据表
+
+TABLE_CN_ETF_FOREIGN_KEY = {'name': 'cn_etf_foreign_key', 'cn': '基金外键',
+                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
+                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
+                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}} 
 
 TABLE_CN_ETF_INDICATORS = {'name': 'cn_etf_indicators', 'cn': 'ETF指标数据',
                              'columns': TABLE_CN_ETF_FOREIGN_KEY['columns'].copy()}
@@ -391,6 +414,30 @@ TABLE_CN_ETF_INDICATORS_BUY = {'name': 'cn_etf_indicators_buy', 'cn': 'ETF指标
 
 TABLE_CN_ETF_INDICATORS_SELL = {'name': 'cn_etf_indicators_sell', 'cn': 'ETF指标卖出',
                                   'columns': __tmp_columns}
+
+# 指数数据表
+ 
+TABLE_CN_INDEX_FOREIGN_KEY = {'name': 'cn_index_foreign_key', 'cn': '指数外键',
+                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
+                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
+                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}},
+                                           "primary_key": ["date", "code"]} 
+
+TABLE_CN_INDEX_INDICATORS = {'name': 'cn_index_indicators', 'cn': '指数指标数据',
+                             'columns': TABLE_CN_INDEX_FOREIGN_KEY['columns'].copy()}
+TABLE_CN_INDEX_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
+
+___tmp_columns = TABLE_CN_INDEX_FOREIGN_KEY['columns'].copy()
+___tmp_columns.update(TABLE_CN_INDEX_BACKTEST_DATA['columns'])
+
+TABLE_CN_INDEX_INDICATORS_BUY = {'name': 'cn_index_indicators_buy', 'cn': '指数指标买入',
+                                 'columns': ___tmp_columns,
+                                           "primary_key": ["date", "code"]}
+
+TABLE_CN_INDEX_INDICATORS_SELL = {'name': 'cn_index_indicators_sell', 'cn': '指数指标卖出',
+                                  'columns': ___tmp_columns,
+                                           "primary_key": ["date", "code"]}
+
 
 
 TABLE_CN_STOCK_STRATEGIES = [
