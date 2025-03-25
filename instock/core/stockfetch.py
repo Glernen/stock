@@ -18,7 +18,7 @@ import instock.core.crawling.stock_dzjy_em as sde
 import instock.core.crawling.stock_hist_em as she
 import instock.core.crawling.stock_fund_em as sff
 import instock.core.crawling.stock_fhps_em as sfe
-from instock.lib.database import mdb
+import instock.lib.database as mdb
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
