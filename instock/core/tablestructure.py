@@ -413,23 +413,44 @@ TABLE_CN_ETF_INDICATORS_SELL = {'name': 'cn_etf_indicators_sell', 'cn': 'ETF指�
 TABLE_CN_INDEX_FOREIGN_KEY = {'name': 'cn_index_foreign_key', 'cn': '指数外键',
                               'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
                                           'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}},
-                                           "primary_key": ["date", "code"]} 
+                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}} 
+
+INDEX_STATS_DATA = {'name': 'calculate_index_indicator', 'cn': '指标计算助手库',
+                    'columns': {'close': {'type': FLOAT, 'cn': '价格', 'size': 0},
+                                'macd': {'type': FLOAT, 'cn': 'dif', 'size': 70},
+                                'macds': {'type': FLOAT, 'cn': 'macd', 'size': 70},
+                                'macdh': {'type': FLOAT, 'cn': 'histogram', 'size': 70},
+                                'kdjk': {'type': FLOAT, 'cn': 'kdjk', 'size': 70},
+                                'kdjd': {'type': FLOAT, 'cn': 'kdjd', 'size': 70},
+                                'kdjj': {'type': FLOAT, 'cn': 'kdjj', 'size': 70},
+                                'boll_ub': {'type': FLOAT, 'cn': 'boll上轨', 'size': 70},
+                                'boll': {'type': FLOAT, 'cn': 'boll', 'size': 70},
+                                'boll_lb': {'type': FLOAT, 'cn': 'boll下轨', 'size': 70},
+                                'cr-ma1': {'type': FLOAT, 'cn': 'cr-ma1', 'size': 70},
+                                'cr-ma2': {'type': FLOAT, 'cn': 'cr-ma2', 'size': 70},
+                                'cr-ma3': {'type': FLOAT, 'cn': 'cr-ma3', 'size': 70},
+                                'rsi_6': {'type': FLOAT, 'cn': 'rsi_6', 'size': 70},
+                                'rsi_12': {'type': FLOAT, 'cn': 'rsi_12', 'size': 70},
+                                'rsi': {'type': FLOAT, 'cn': 'rsi', 'size': 70},
+                                'rsi_24': {'type': FLOAT, 'cn': 'rsi_24', 'size': 70},
+                                'wr_6': {'type': FLOAT, 'cn': 'wr_6', 'size': 70},
+                                'wr_10': {'type': FLOAT, 'cn': 'wr_10', 'size': 70},
+                                'wr_14': {'type': FLOAT, 'cn': 'wr_14', 'size': 70},
+                                'cci': {'type': FLOAT, 'cn': 'cci', 'size': 70},
+                                'cci_84': {'type': FLOAT, 'cn': 'cci_84', 'size': 70}}}
 
 TABLE_CN_INDEX_INDICATORS = {'name': 'cn_index_indicators', 'cn': '指数指标数据',
                              'columns': TABLE_CN_INDEX_FOREIGN_KEY['columns'].copy()}
-TABLE_CN_INDEX_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
+TABLE_CN_INDEX_INDICATORS['columns'].update(INDEX_STATS_DATA['columns'])
 
 ___tmp_columns = TABLE_CN_INDEX_FOREIGN_KEY['columns'].copy()
 ___tmp_columns.update(TABLE_CN_INDEX_BACKTEST_DATA['columns'])
 
 TABLE_CN_INDEX_INDICATORS_BUY = {'name': 'cn_index_indicators_buy', 'cn': '指数指标买入',
-                                 'columns': ___tmp_columns,
-                                           "primary_key": ["date", "code"]}
+                                 'columns': ___tmp_columns}
 
 TABLE_CN_INDEX_INDICATORS_SELL = {'name': 'cn_index_indicators_sell', 'cn': '指数指标卖出',
-                                  'columns': ___tmp_columns,
-                                           "primary_key": ["date", "code"]}
+                                  'columns': ___tmp_columns}
 
 
 

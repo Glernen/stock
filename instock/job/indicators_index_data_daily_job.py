@@ -21,6 +21,7 @@ import instock.lib.trade_time as trd
 from instock.lib.singleton_type import singleton_type
 
 
+
 __author__ = 'hqm'
 __date__ = '2025/03/25'
 
@@ -212,6 +213,11 @@ def fetch_index_hist(
     :rtype: pandas.DataFrame
     """
     code_id_dict = code_id_map_em()
+    try:
+        market_id = code_id_dict[symbol]
+    except KeyError:
+        logging.error(f"未找到 {symbol} 的市场代码")
+        return pd.DataFrame()
     adjust_dict = {"qfq": "1", "hfq": "2", "": "0"}
     period_dict = {"daily": "101", "weekly": "102", "monthly": "103"}
     url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
@@ -261,7 +267,8 @@ def fetch_index_hist(
     temp_df["涨跌幅"] = pd.to_numeric(temp_df["涨跌幅"])
     temp_df["涨跌额"] = pd.to_numeric(temp_df["涨跌额"])
     temp_df["换手率"] = pd.to_numeric(temp_df["换手率"])
-
+    # 添加 code 列
+    temp_df['code'] = symbol
     return temp_df
 
 @lru_cache()
@@ -305,7 +312,7 @@ def code_id_map_em() -> dict:
             "fltt": "2",
             "invt": "2",
             "fid": "f3",
-            "fs": config["fs"],
+            "fs": "b:MK0010",
             "fields": "f12",
             "_": "1623833739532",
         }
@@ -378,14 +385,14 @@ def prepare(date):
 
 def run_check(stocks, date=None, workers=40):
     data = {}
-    columns = list(tbs.STOCK_STATS_DATA['columns'])
+    columns = list(tbs.INDEX_STATS_DATA['columns'])
     columns.insert(0, 'code')
     columns.insert(0, 'date')
     data_column = columns
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             # 使用日期参数作为唯一键
-            futures = {executor.submit(idr.get_index_indicator, k, stocks[k], data_column, date=date): (k, date) for k in stocks}
+            futures = {executor.submit(idr.get_indicator, k, stocks[k], data_column, date=date): (k, date) for k in stocks}
             for future in concurrent.futures.as_completed(futures):
                 stock, current_date = futures[future]
                 try:
