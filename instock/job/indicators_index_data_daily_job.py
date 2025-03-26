@@ -2,24 +2,24 @@
 # -*- coding: utf-8 -*-
 
 import logging
+import pymysql
+import concurrent.futures
 import pandas as pd
 import os.path
 import sys
-import numpy as np
-from datetime import datetime, timedelta
-import requests
+
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
+import numpy as np
+from datetime import datetime, timedelta
+import requests
 import instock.lib.database as mdb
 import instock.core.tablestructure as tbs
 import instock.core.indicator.calculate_index_indicator as idr
 from functools import lru_cache
-import concurrent.futures
-import instock.core.stockfetch as stf
 import instock.lib.trade_time as trd
 from instock.lib.singleton_type import singleton_type
-
 
 
 __author__ = 'hqm'
@@ -101,13 +101,6 @@ class index_hist_data(metaclass=singleton_type):
 
 
 def index_zh_a_spot_em() -> pd.DataFrame:
-    """
-    东方财富网-沪深京 A 股-实时行情
-    https://quote.eastmoney.com/center/gridlist.html#hs_a_board
-    指数行情https://quote.eastmoney.com/center/hszs.html
-    :return: 实时行情
-    :rtype: pandas.DataFrame
-    """
     url = "http://push2.eastmoney.com/api/qt/clist/get"
     # 初始请求参数，先获取总数据量和 page_size
     params = {
@@ -179,7 +172,7 @@ def index_zh_a_spot_em() -> pd.DataFrame:
         numeric_cols = [
             "最新价", "涨跌幅", "涨跌额", "成交量", "成交额", "最高", "最低", "今开", "昨收"]
         temp_df[numeric_cols] = temp_df[numeric_cols].apply(pd.to_numeric, errors="coerce")
-        print(f"temp_df: {temp_df}")
+        # print(f"temp_df: {temp_df}")
 
         return temp_df
     except requests.RequestException as e:
@@ -196,28 +189,7 @@ def fetch_index_hist(
     end_date: str = "20500101",
     adjust: str = "",
 ) -> pd.DataFrame:
-    """
-    东方财富网-行情首页-沪深京 A 股-每日行情
-    https://quote.eastmoney.com/concept/sh603777.html?from=classic
-    :param symbol: 股票代码
-    :type symbol: str
-    :param period: choice of {'daily', 'weekly', 'monthly'}
-    :type period: str
-    :param start_date: 开始日期
-    :type start_date: str
-    :param end_date: 结束日期
-    :type end_date: str
-    :param adjust: choice of {"qfq": "前复权", "hfq": "后复权", "": "不复权"}
-    :type adjust: str
-    :return: 每日行情
-    :rtype: pandas.DataFrame
-    """
     code_id_dict = code_id_map_em()
-    try:
-        market_id = code_id_dict[symbol]
-    except KeyError:
-        logging.error(f"未找到 {symbol} 的市场代码")
-        return pd.DataFrame()
     adjust_dict = {"qfq": "1", "hfq": "2", "": "0"}
     period_dict = {"daily": "101", "weekly": "102", "monthly": "103"}
     url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
@@ -267,8 +239,7 @@ def fetch_index_hist(
     temp_df["涨跌幅"] = pd.to_numeric(temp_df["涨跌幅"])
     temp_df["涨跌额"] = pd.to_numeric(temp_df["涨跌额"])
     temp_df["换手率"] = pd.to_numeric(temp_df["换手率"])
-    # 添加 code 列
-    temp_df['code'] = symbol
+
     return temp_df
 
 @lru_cache()
@@ -349,6 +320,10 @@ def code_id_map_em() -> dict:
 
 
 def prepare(date):
+    engine = mdb.engine()
+    if engine is None:
+        logging.error("数据库连接失败，无法继续执行。")
+        return
     try:
         indexs_data = index_hist_data(date=date).get_data()
         if indexs_data is None:
@@ -365,20 +340,24 @@ def prepare(date):
         dataVal = pd.DataFrame(results.values())
         dataVal.drop('date', axis=1, inplace=True)  # 删除日期字段，然后和原始数据合并。
 
-        # print(f"dataKey 'code' dtype: {dataKey['code'].dtype}")
-        # print(f"dataVal 'code' dtype: {dataVal['code'].dtype}")
-
         data = pd.merge(dataKey, dataVal, on=['code'], how='left')
-        print(f'{data}')
-        # 单例，时间段循环必须改时间
         date_str = date.strftime("%Y-%m-%d")
-        if date.strftime("%Y-%m-%d") != data.iloc[0]['date']:
+        if date_str != data.iloc[0]['date']:
             data['date'] = date_str
+
+        # 处理NaN值
+        data = data.where(pd.notnull(data), None)
+
+        print(f'{data}')
+        # 先删除当天的旧数据
+        date_str = date.strftime("%Y-%m-%d")
+        with engine.begin() as conn:
+            delete_sql = text(f"DELETE FROM `{table_name}` WHERE `date` = :date")
+            conn.execute(delete_sql, {"date": date_str})
 
         # 分批插入数据
         chunksize = 1000  # 可以根据实际情况调整
-        data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
-
+        mdb.insert_db_from_df(data, table_name, None, False, '`date`, `code`')
     except Exception as e:
         logging.error(f"indicators_data_daily_job.prepare处理异常：{e}")
 
@@ -389,10 +368,31 @@ def run_check(stocks, date=None, workers=40):
     columns.insert(0, 'code')
     columns.insert(0, 'date')
     data_column = columns
+
+    preprocessed_stocks = {}
+    for key, df in stocks.items():
+        if not df.empty:
+            new_df = df.copy()
+            new_df['code'] = key[0]
+            new_df = new_df.rename(columns={
+                '日期': 'date',
+                '开盘': 'open',
+                '收盘': 'close',
+                '最高': 'high',
+                '最低': 'low',
+                '成交额': 'amount',
+                '成交量': 'volume',
+                '换手率': 'turnover',
+                '涨跌幅': 'quote_change',
+                '涨跌额': 'ups_downs'
+            })
+            preprocessed_stocks[key] = new_df
+        else:
+            preprocessed_stocks[key] = df
+
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-            # 使用日期参数作为唯一键
-            futures = {executor.submit(idr.get_indicator, k, stocks[k], data_column, date=date): (k, date) for k in stocks}
+            futures = {executor.submit(idr.get_indicator, k, preprocessed_stocks[k], data_column, date=date): (k, date) for k in preprocessed_stocks}
             for future in concurrent.futures.as_completed(futures):
                 stock, current_date = futures[future]
                 try:
@@ -408,10 +408,13 @@ def run_check(stocks, date=None, workers=40):
     else:
         return data
 
-
 # 对每日指标数据，进行筛选。将符合条件的。二次筛选出来。
 # 只是做简单筛选
 def guess_buy(date):
+    engine = mdb.engine()
+    if engine is None:
+        logging.error("数据库连接失败，无法继续执行。")
+        return
     try:
         _table_name = tbs.TABLE_CN_INDEX_INDICATORS['name']
         if not mdb.checkTableIsExist(_table_name):
@@ -419,13 +422,13 @@ def guess_buy(date):
 
         _columns = tuple(tbs.TABLE_CN_INDEX_FOREIGN_KEY['columns'])
         _selcol = '`,`'.join(_columns)
-        
+
         sql = f'''SELECT `{_selcol}` FROM `{_table_name}` WHERE `date` = '{date}' and
                 `kdjj` <= 0 and `rsi_6` <= 30 and
                 `cci` <= -130 and `rsi_12` <= 45 and `close` <= `boll_lb` and
                 ABS(`wr_6`) >= 90 and ABS(`wr_10`) >= 90'''
 
-        data = pd.read_sql(sql=sql, con=mdb.engine())
+        data = pd.read_sql(sql=sql, con=engine)
         data = data.drop_duplicates(subset="code", keep="last")
 
         if len(data.index) == 0:
@@ -435,16 +438,25 @@ def guess_buy(date):
         _columns_backtest = tuple(tbs.TABLE_CN_INDEX_BACKTEST_DATA['columns'])
         data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)])
 
+        # 先删除当天的旧数据
+        date_str = date.strftime("%Y-%m-%d")
+        with engine.begin() as conn:
+            delete_sql = text(f"DELETE FROM `{table_name}` WHERE `date` = :date")
+            conn.execute(delete_sql, {"date": date_str})
+
         # 分批插入数据
         chunksize = 1000  # 可以根据实际情况调整
-        data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
-
+        mdb.insert_db_from_df(data, table_name, None, False, '`date`, `code`')
+        logging.info(f"成功插入 {date_str} 的 {len(data)} 条基金买入指标数据")
     except Exception as e:
-        logging.error(f"indicators_data_daily_job.guess_buy处理异常：{e}")
-
+        logging.error(f"indicators_etf_data_daily_job.guess_buy处理异常：{e}")
 
 # 设置卖出数据。
 def guess_sell(date):
+    engine = mdb.engine()
+    if engine is None:
+        logging.error("数据库连接失败，无法继续执行。")
+        return
     try:
         _table_name = tbs.TABLE_CN_INDEX_INDICATORS['name']
         if not mdb.checkTableIsExist(_table_name):
@@ -453,12 +465,13 @@ def guess_sell(date):
         _columns = tuple(tbs.TABLE_CN_INDEX_FOREIGN_KEY['columns'])
         _selcol = '`,`'.join(_columns)
 
-        sql = f'''SELECT `{_selcol}` FROM `{_table_name}` WHERE `date` = '{date}' and
+        date_str = date.strftime("%Y-%m-%d")
+        sql = f'''SELECT `{_selcol}` FROM `{_table_name}` WHERE `date` = '{date_str}' and
                 `kdjj` >= 90 and `rsi_6` >= 65 and
                 `cci` >= 180 and `rsi_12` >= 65 and `close` >= `boll_ub` and
                 ABS(`wr_6`) <= 5'''
 
-        data = pd.read_sql(sql=sql, con=mdb.engine())
+        data = pd.read_sql(sql=sql, con=engine)
         data = data.drop_duplicates(subset="code", keep="last")
 
         if len(data.index) == 0:
@@ -466,15 +479,21 @@ def guess_sell(date):
 
         table_name = tbs.TABLE_CN_INDEX_INDICATORS_SELL['name']
         _columns_backtest = tuple(tbs.TABLE_CN_INDEX_BACKTEST_DATA['columns'])
-        data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)])
+        data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)], ignore_index=True)
+
+
+        # 先删除当天的旧数据
+        date_str = date.strftime("%Y-%m-%d")
+        with engine.begin() as conn:
+            delete_sql = text(f"DELETE FROM `{table_name}` WHERE `date` = :date")
+            conn.execute(delete_sql, {"date": date_str})
 
         # 分批插入数据
         chunksize = 1000  # 可以根据实际情况调整
-        data.to_sql(table_name, mdb.engine(), if_exists='append', index=False, chunksize=chunksize)
-
+        mdb.insert_db_from_df(data, table_name, None, False, '`date`, `code`')
+        logging.info(f"成功插入 {date_str} 的 {len(data)} 条指数卖出指标数据")
     except Exception as e:
-        logging.error(f"indicators_data_daily_job.guess_sell处理异常：{e}")
-
+        logging.error(f"indicators_index_data_daily_job.guess_sell处理异常：{e}")
 
 
 def main():

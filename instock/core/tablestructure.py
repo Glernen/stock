@@ -414,7 +414,6 @@ TABLE_CN_INDEX_FOREIGN_KEY = {'name': 'cn_index_foreign_key', 'cn': '指数外�
                               'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
                                           'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60},
                                           'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}} 
-
 INDEX_STATS_DATA = {'name': 'calculate_index_indicator', 'cn': '指标计算助手库',
                     'columns': {'close': {'type': FLOAT, 'cn': '价格', 'size': 0},
                                 'macd': {'type': FLOAT, 'cn': 'dif', 'size': 70},
@@ -441,7 +440,7 @@ INDEX_STATS_DATA = {'name': 'calculate_index_indicator', 'cn': '指标计算助�
 
 TABLE_CN_INDEX_INDICATORS = {'name': 'cn_index_indicators', 'cn': '指数指标数据',
                              'columns': TABLE_CN_INDEX_FOREIGN_KEY['columns'].copy()}
-TABLE_CN_INDEX_INDICATORS['columns'].update(INDEX_STATS_DATA['columns'])
+TABLE_CN_INDEX_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
 
 ___tmp_columns = TABLE_CN_INDEX_FOREIGN_KEY['columns'].copy()
 ___tmp_columns.update(TABLE_CN_INDEX_BACKTEST_DATA['columns'])
