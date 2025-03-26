@@ -13,7 +13,7 @@ cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
 import instock.lib.database as mdb
 import instock.core.tablestructure as tbs
-import instock.core.indicator.calculate_indicator as idr
+import instock.core.indicator.calculate_index_indicator as idr
 from functools import lru_cache
 import concurrent.futures
 import instock.core.stockfetch as stf
@@ -385,7 +385,7 @@ def run_check(stocks, date=None, workers=40):
     try:
         with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
             # 使用日期参数作为唯一键
-            futures = {executor.submit(idr.get_indicator, k, stocks[k], data_column, date=date): (k, date) for k in stocks}
+            futures = {executor.submit(idr.get_index_indicator, k, stocks[k], data_column, date=date): (k, date) for k in stocks}
             for future in concurrent.futures.as_completed(futures):
                 stock, current_date = futures[future]
                 try:
