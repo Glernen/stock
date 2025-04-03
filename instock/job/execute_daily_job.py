@@ -20,6 +20,7 @@ logging.basicConfig(format='%(asctime)s %(message)s', filename=os.path.join(log_
 logging.getLogger().setLevel(logging.INFO)
 import init_job as bj
 import basic_data_daily_job as hdj
+import basic_data as bd
 import basic_data_other_daily_job as hdtj
 import basic_data_after_close_daily_job as acdj
 import indicators_data_daily_job as gdj
@@ -38,12 +39,14 @@ def main():
     start = time.time()
     _start = datetime.datetime.now()
     logging.info("######## 任务执行时间: %s #######" % _start.strftime("%Y-%m-%d %H:%M:%S.%f"))
-    # 第1步创建数据库
+    # 第1.1步创建数据库
     bj.main()
+    # 第1.2步创建数据库
+    bd.main()
     # 第2.1步创建股票基础数据表
-    hdj.main()
+    # hdj.main()
     # 第2.2步创建综合股票数据表
-    sddj.main()
+    # sddj.main()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # # 第3.1步创建股票其它基础数据表
         executor.submit(hdtj.main)

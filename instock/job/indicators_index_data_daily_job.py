@@ -145,7 +145,7 @@ class index_hist_data(metaclass=singleton_type):
         try:
             # max_workers是None还是没有给出，将默认为机器cup个数*5
             with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as executor:
-                future_to_stock = {executor.submit(fetch_index_hist, stock[1], "daily", date_start, "20500101", "qfq"): stock for stock
+                future_to_stock = {executor.submit(fetch_index_hist, stock[1], "daily", date_start, "20500101", ""): stock for stock
                                    in stocks}
                 # print(f'{future_to_stock}')
                 for future in concurrent.futures.as_completed(future_to_stock):
@@ -251,6 +251,8 @@ def index_zh_a_spot_em() -> pd.DataFrame:
         return pd.DataFrame()
 
 
+
+
 def fetch_index_hist(
     symbol: str = "000001",
     period: str = "daily",
@@ -258,7 +260,11 @@ def fetch_index_hist(
     end_date: str = "20500101",
     adjust: str = "",
 ) -> pd.DataFrame:
-    code_id_dict = code_id_map_em()
+    # 获取股票列表
+    conn = DBManager.get_new_connection()
+    stock_df = pd.read_sql("SELECT code_id FROM cn_index_info where code_str = {symbol}", conn)
+    conn.close()
+    code_id_dict = stock_df
     adjust_dict = {"qfq": "1", "hfq": "2", "": "0"}
     period_dict = {"daily": "101", "weekly": "102", "monthly": "103"}
     url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
@@ -324,23 +330,23 @@ def code_id_map_em() -> dict:
     code_id_dict = {}
 
     # 定义不同市场的参数配置
-    market_configs = [
-        {
-            "market_id": 1,
-            "fs": "m:1 t:2,m:1 t:23",
-            "column_name": "sh_code"
-        },
-        {
-            "market_id": 0,
-            "fs": "m:0 t:6,m:0 t:80",
-            "column_name": "sz_code"
-        },
-        {
-            "market_id": 0,
-            "fs": "m:0 t:81 s:2048",
-            "column_name": "bj_code"
-        }
-    ]
+    # market_configs = [
+    #     {
+    #         "market_id": 1,
+    #         "fs": "m:1 t:2,m:1 t:23",
+    #         "column_name": "sh_code"
+    #     },
+    #     {
+    #         "market_id": 0,
+    #         "fs": "m:0 t:6,m:0 t:80",
+    #         "column_name": "sz_code"
+    #     },
+    #     {
+    #         "market_id": 0,
+    #         "fs": "m:0 t:81 s:2048",
+    #         "column_name": "bj_code"
+    #     }
+    # ]
 
     for config in market_configs:
         # 先获取总数据量和 page_size
