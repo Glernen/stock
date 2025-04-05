@@ -32,6 +32,8 @@ from instock.lib.database import db_host, db_user, db_password, db_database, db_
 numeric_cols = ["f2", "f3", "f4", "f5", "f6", "f7", "f8", "f10", "f15", "f16", "f17", "f18", "f22", "f11", "f24", "f25", "f9", "f115", "f114", "f23", "f112", "f113", "f61", "f48", "f37", "f49", "f57", "f40", "f41", "f45", "f46", "f38", "f39", "f20", "f21" ]
 date_cols = ["f26", "f221"]
 
+def is_open(price):
+    return not np.isnan(price)
 
 """
 获取沪市A股+深市A股所有股票指标数据
@@ -121,10 +123,10 @@ def stock_selection() -> pd.DataFrame:
             # 3. 生成并执行SQL
             sql_txt = sql语句生成器(table_name, temp_df)
             if not execute_raw_sql(sql_txt):
-                raise Exception("主表写入失败")
-            print(f"[Success] 实时行情主表写入完成，数据量：{len(temp_df)}")
+                raise Exception("自选主表写入失败")
+            print(f"[Success] 自选主表主表写入完成，数据量：{len(temp_df)}")
         except Exception as e:
-            print(f"[Error] 主表写入失败: {e}")
+            print(f"[Error] 自选主表写入失败: {e}")
         #################################################
 
         return temp_df
@@ -246,7 +248,7 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
         "_": "1623833739532",
     }
     try:
-        temp_df = fetch_zh_a_spot_data(url,params,page_size,"pn").replace({np.nan: None}) # 将数据中NaN空数据进行替换：替换np.nan为None
+        temp_df = fetch_zh_a_spot_data(url,params,page_size,"pn")# 将数据中NaN空数据进行替换：替换np.nan为None
 
         # 定义数值列清单
         numeric_cols = [
@@ -265,8 +267,11 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
 
         # 获取上证交易所日历
         sh_cal = mcal.get_calendar('SSE')
-        latest_trade_date = sh_cal.schedule(start_date='2022-01-01', end_date=pd.Timestamp.today()).index[-1].strftime("%Y-%m-%d")
+        latest_trade_date = sh_cal.schedule(start_date='2020-01-01', end_date=pd.Timestamp.today()).index[-1].strftime("%Y-%m-%d")
         temp_df.loc[:, "date"] = latest_trade_date
+
+        temp_df = temp_df.loc[temp_df['new_price'].apply(is_open)]
+        temp_df = temp_df.replace({np.nan: None}) 
 
         # temp_df["date"] = pd.to_datetime("today").strftime("%Y-%m-%d")  # 添加日期字段
         # print(f'实时行情数据主表{temp_df}')
@@ -288,10 +293,10 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
             # 3. 生成并执行SQL
             sql_txt = sql语句生成器(table_name, temp_df)
             if not execute_raw_sql(sql_txt):
-                raise Exception("主表写入失败")
+                raise Exception("股票主表写入失败")
             print(f"[Success] 实时行情主表写入完成，数据量：{len(temp_df)}")
         except Exception as e:
-            print(f"[Error] 主表写入失败: {e}")
+            print(f"[Error] 股票主表写入失败: {e}")
         #################################################
 
 
@@ -314,9 +319,15 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
             stock_info_df = temp_df[existing_columns]
 
             # 手动设置固定日期（例如 1212-12-12）做索引使用
-            fixed_date = "1212-12-12"
+            # fixed_date = "1212-12-12"
+            fixed_date = latest_trade_date
             stock_info_df = temp_df[existing_columns].copy()  # 显式创建独立副本
             stock_info_df.loc[:, "date"] = fixed_date
+            if "market_id" in stock_info_df.columns and "code" in stock_info_df.columns:
+                stock_info_df.loc[:, "code_market"] = (
+                    stock_info_df["market_id"].astype(str) + "." +
+                    stock_info_df["code"].astype(str).str.zfill(6)
+                )
             print(f"[Success] stock_info_df：{stock_info_df}")
             print(f"[Success] stock_info_df-columns：{stock_info_df.columns}")
 
@@ -335,10 +346,10 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
             # 4. 生成并执行SQL
             sql_txt = sql语句生成器(stock_info, stock_info_df)
             if not execute_raw_sql(sql_txt):
-                raise Exception("基础表写入失败")
-            print(f"[Success] 基础信息表写入完成，数据量：{len(stock_info_df)}")
+                raise Exception("股票基础表写入失败")
+            print(f"[Success] 股票基础信息表写入完成，数据量：{len(stock_info_df)}")
         except Exception as e:
-            print(f"[Error] 基础表写入失败: {e}")
+            print(f"[Error] 股票基础表写入失败: {e}")
 
         return temp_df
     except Exception as e:
@@ -403,190 +414,6 @@ def fetch_zh_a_spot_data(
 
     return pd.DataFrame(data)
 
-########################################
-#获取沪市A股+深市A股历史股票数据数据并写入数据库
-
-
-
-def fetch_all_stock_hist():
-    """多线程获取全量股票历史数据（日/周/月）并批量存储"""
-    # 日频数据
-    stock_hist_daily_name = tbs.CN_STOCK_HIST_DAILY_DATA['name']
-    # stock_hist_daily_cols = tbs.CN_STOCK_HIST_DAILY_DATA['columns']
-
-    # 周频数据
-    stock_hist_weekly_name = tbs.CN_STOCK_HIST_WEEKLY_DATA['name']
-    # stock_hist_weekly_cols = tbs.CN_STOCK_HIST_WEEKLY_DATA['columns']
-
-    # 月频数据
-    stock_hist_monthly_name = tbs.CN_STOCK_HIST_MONTHLY_DATA['name']
-    # stock_hist_monthly_cols = tbs.CN_STOCK_HIST_MONTHLY_DATA['columns']
-
-    for table_config in [tbs.CN_STOCK_HIST_DAILY_DATA,
-                         tbs.CN_STOCK_HIST_WEEKLY_DATA,
-                         tbs.CN_STOCK_HIST_MONTHLY_DATA]:
-        create_table_if_not_exists(table_config['name'])
-
-    # 获取股票列表
-    conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code_str, code_id, name FROM cn_stock_info", conn)  # 添加 name 
-    conn.close()
-
-    # 生成 secid_list 并包含 name
-    secid_list = [
-        (f"{row['code_id']}.{row['code_str']}", row['name'])  # 将 name 与 secid 绑定
-        for _, row in stock_df.iterrows()
-    ]
-
-    # 准备数据容器
-    daily_data = pd.DataFrame()
-    weekly_data = pd.DataFrame()
-    monthly_data = pd.DataFrame()
-
-    # 多线程获取
-    with ThreadPoolExecutor(max_workers=10) as executor:
-        futures = []
-        for secid, name in secid_list:  # 遍历包含 name 的 secid_list
-            code_id, code_str = secid.split('.')
-            # 提交任务时传递 name
-            futures.append(executor.submit(fetch_single_stock_hist, code_str, code_id, "daily", name))
-            futures.append(executor.submit(fetch_single_stock_hist, code_str, code_id, "weekly", name))
-            futures.append(executor.submit(fetch_single_stock_hist, code_str, code_id, "monthly", name))
-
-        # 进度监控
-        for future in tqdm(as_completed(futures), total=len(futures), desc="获取历史数据"):
-            data = future.result()
-            if data is None:
-                continue
-    
-            period = data['period']
-            df = data['df']
-            
-            # 添加股票代码到 DataFrame（假设 fetch_single_stock_hist 返回的 df 未包含 code）
-            # df['code'] = data.get('code_str', 'unknown')  # 根据实际参数调整
-    
-            # 按周期合并到对应的 DataFrame
-            if period == 'daily':
-                daily_data = pd.concat([daily_data, df], axis=0, ignore_index=False)
-            elif period == 'weekly':
-                weekly_data = pd.concat([weekly_data, df], axis=0, ignore_index=False)
-            elif period == 'monthly':
-                monthly_data = pd.concat([monthly_data, df], axis=0, ignore_index=False)
-
-    daily_data_columns = data['df'].columns
-    print(f'daily_data_columns:{daily_data_columns}')
-
-    # 3. 同步表结构（动态添加字段）
-    conn = DBManager.get_new_connection()
-    try:
-        同步表结构(conn, stock_hist_daily_name, daily_data_columns)
-    finally:
-        if conn.is_connected():
-            conn.close()
-            
-    # 3. 同步表结构（动态添加字段）
-    conn = DBManager.get_new_connection()
-    try:
-        同步表结构(conn, stock_hist_weekly_name, daily_data_columns)
-    finally:
-        if conn.is_connected():
-            conn.close()
-
-    # 3. 同步表结构（动态添加字段）
-    conn = DBManager.get_new_connection()
-    try:
-        同步表结构(conn, stock_hist_monthly_name, daily_data_columns)
-    finally:
-        if conn.is_connected():
-            conn.close()
-
-    # 3. 生成并执行SQL
-    sql_txt = sql语句生成器(stock_hist_daily_name, daily_data)
-    if not execute_raw_sql(sql_txt):
-        raise Exception("主表写入失败")
-    print(f"[Success] 实时行情主表写入完成，数据量：{len(daily_data)}")
-
-    # 3. 生成并执行SQL
-    sql_txt = sql语句生成器(stock_hist_weekly_name, weekly_data)
-    if not execute_raw_sql(sql_txt):
-        raise Exception("主表写入失败")
-    print(f"[Success] 实时行情主表写入完成，数据量：{len(weekly_data)}")
-
-    # 3. 生成并执行SQL
-    sql_txt = sql语句生成器(stock_hist_monthly_name, monthly_data)
-    if not execute_raw_sql(sql_txt):
-        raise Exception("主表写入失败")
-    print(f"[Success] 实时行情主表写入完成，数据量：{len(monthly_data)}")
-
-
-def fetch_single_stock_hist(code_str, code_id, period, name):
-    """获取单个股票指定周期的历史数据"""
-    try:
-        url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
-        params = {
-            "fields1": "f1,f2,f3,f4,f5,f6",
-            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f116",
-            "ut": "7eea3edcaed734bea9cbfc24409ed989",
-            "klt": {'daily':101, 'weekly':102, 'monthly':103}[period],
-            "fqt": 0,  # 不复权
-            "secid": f"{code_id}.{code_str}",
-            # "beg": "19900101",
-            # "beg": "20200101",
-            "beg": datetime.datetime.now().strftime("%Y%m%d"),
-            "end": datetime.datetime.now().strftime("%Y%m%d"),
-            "_": int(time.time()*1000)
-        }
-
-        r = requests.get(url, params=params, timeout=10)
-        data_json = r.json()
-
-        if not data_json.get("data"):
-            return None
-
-        df = pd.DataFrame([item.split(",") for item in data_json["data"]["klines"]])
-
-        table_name_cols = tbs.CN_STOCK_HIST_DAILY_DATA['columns']
-
-        # map生成中文映射字典
-        cn_name = {
-            table_name_cols[k]['map']: table_name_cols[k]['cn']
-            for k in table_name_cols
-            if 'map' in table_name_cols[k] and table_name_cols[k]['map']
-        }
-
-        # map生成英文映射字典
-        en_name = {
-            table_name_cols[k]['map']: table_name_cols[k]['en']
-            for k in table_name_cols
-            if 'map' in table_name_cols[k] and table_name_cols[k]['map'] is not None
-        }
-
-
-        # 格式处理
-        numeric_cols = [1,2,3,4,5,6,7,8,9,10]
-
-        df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
-        # date_cols = [0]
-        # df[date_cols] = df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))  
-        df.rename(columns=en_name, inplace=True) # 将默认列名改为英文列名.
-        # print(f'df  :{df}')
-        # print(f'df-columns  :{df},{df.columns}')
-        df['date'] = pd.to_datetime(df['date'])
-        df['code'] = code_str
-        df['code_str'] = code_str
-        df['period'] = period
-        df['name'] = name  # 关键操作
-        # print(f'df-columns  :{df.columns}')
-        return {'period': period, 'df': df , 'temp_df': pd.DataFrame(df)}
-
-        # return {'period': period, 'df': df}
-
-    except Exception as e:
-        print(f"获取{code_str} {period}数据失败: {str(e)}")
-        return None
-
-
-
 
 ########################################
 #获取ETF基金实时数据并写入数据库
@@ -644,8 +471,8 @@ def etf_spot_em() -> pd.DataFrame:
         "_": "1672806290972",
     }
     try:
-        temp_df = etf_spot_data(url,params,page_size,"pn").replace({np.nan: None}) # 将数据中NaN空数据进行替换：替换np.nan为None
-
+        # temp_df = etf_spot_data(url,params,page_size,"pn").replace({np.nan: None}) # 将数据中NaN空数据进行替换：替换np.nan为None
+        temp_df = etf_spot_data(url,params,page_size,"pn")
         # ==== 智能数值列转换 ====
         numeric_cols = [
             'f2','f3','f4','f5','f6','f7','f8','f9','f10','f11',
@@ -689,6 +516,9 @@ def etf_spot_em() -> pd.DataFrame:
         temp_df.loc[:, "date"] = latest_trade_date
         # print(f'实时ETF基金数据主表{temp_df}')
 
+        temp_df = temp_df.loc[temp_df['new_price'].apply(is_open)]
+        temp_df = temp_df.replace({np.nan: None}) 
+
          # ==== 主表（cn_etf_spot）写入逻辑 ====
         try:
             # 1. 创建表（如果不存在）
@@ -705,10 +535,10 @@ def etf_spot_em() -> pd.DataFrame:
             # 3. 生成并执行SQL
             sql_txt = sql语句生成器(table_name, temp_df)
             if not execute_raw_sql(sql_txt):
-                raise Exception("主表写入失败")
-            print(f"[Success] 实时行情主表写入完成，数据量：{len(temp_df)}")
+                raise Exception("基金主表写入失败")
+            print(f"[Success] 基金实时行情主表写入完成，数据量：{len(temp_df)}")
         except Exception as e:
-            print(f"[Error] 主表写入失败: {e}")
+            print(f"[Error] 基金主表写入失败: {e}")
         #################################################
 
 
@@ -728,9 +558,15 @@ def etf_spot_em() -> pd.DataFrame:
 
 
         # 手动设置固定日期（例如 1212-12-12）做索引使用
-        fixed_date = "1212-12-12"
+        # fixed_date = "1212-12-12"
+        fixed_date = latest_trade_date
         etf_info_df = temp_df[existing_columns].copy()  # 显式创建独立副本
         etf_info_df.loc[:, "date"] = fixed_date  # 使用 .loc 进行安全赋值
+        if "market_id" in etf_info_df.columns and "code" in etf_info_df.columns:
+            etf_info_df.loc[:, "code_market"] = (
+                etf_info_df["market_id"].astype(str) + "." +
+                etf_info_df["code"].astype(str).str.zfill(6)
+            )
         print(f"[Success] etf_info_df：{etf_info_df}")
 
          # ==== 主表（cn_stock_spot）写入逻辑 ====
@@ -749,10 +585,10 @@ def etf_spot_em() -> pd.DataFrame:
             # 3. 生成并执行SQL
             sql_txt = sql语句生成器(etf_info, etf_info_df)
             if not execute_raw_sql(sql_txt):
-                raise Exception("主表写入失败")
+                raise Exception("基金基础表写入失败")
             print(f"[Success] EFT基金基础信息表写入完成，数据量：{len(etf_info_df)}")
         except Exception as e:
-            print(f"[Error] 主表写入失败: {e}")
+            print(f"[Error] 基金基础表写入失败: {e}")
         #################################################
         return temp_df
     except Exception as e:
@@ -815,87 +651,6 @@ def etf_spot_data(
 
     return pd.DataFrame(data)
 
-#获取ETF基金历史数据并写入数据库
-
-def fund_etf_hist_em(
-    symbol: str = "159707",
-    period: str = "daily",
-    start_date: str = "19700101",
-    end_date: str = "20500101",
-    adjust: str = "",
-    ) -> pd.DataFrame:
-    """
-    东方财富-ETF 行情
-    https://quote.eastmoney.com/sz159707.html
-    :param symbol: ETF 代码
-    :type symbol: str
-    :param period: choice of {'daily', 'weekly', 'monthly'}
-    :type period: str
-    :param start_date: 开始日期
-    :type start_date: str
-    :param end_date: 结束日期
-    :type end_date: str
-    :param adjust: choice of {"qfq": "前复权", "hfq": "后复权", "": "不复权"}
-    :type adjust: str
-    :return: 每日行情
-    :rtype: pandas.DataFrame
-    """
-    code_id_dict = _fund_etf_code_id_map_em()
-    if symbol not in code_id_dict:
-        logging.error(f"未找到 {symbol} 的市场标识映射")
-        return pd.DataFrame()
-    adjust_dict = {"qfq": "1", "hfq": "2", "": "0"}
-    period_dict = {"daily": "101", "weekly": "102", "monthly": "103"}
-    url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
-    params = {
-        "fields1": "f1,f2,f3,f4,f5,f6",
-        "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f116",
-        "ut": "7eea3edcaed734bea9cbfc24409ed989",
-        "klt": period_dict[period],
-        "fqt": adjust_dict[adjust],
-        "secid": f"{code_id_dict[symbol]}.{symbol}",
-        "beg": start_date,
-        "end": end_date,
-        "_": "1623766962675",
-    }
-    try:
-        # logging.info(f"请求 {symbol} 历史数据，参数：{params}")
-        r = requests.get(url, params=params)
-        r.raise_for_status()
-        data_json = r.json()
-        if not (data_json["data"] and data_json["data"]["klines"]):
-            # logging.info(f"未获取到 {symbol} 从 {start_date} 到 {end_date} 的历史数据，响应数据：{data_json}")
-            return pd.DataFrame()
-        temp_df = pd.DataFrame([item.split(",") for item in data_json["data"]["klines"]])
-        temp_df.columns = [
-            "日期",
-            "开盘",
-            "收盘",
-            "最高",
-            "最低",
-            "成交量",
-            "成交额",
-            "振幅",
-            "涨跌幅",
-            "涨跌额",
-            "换手率",
-        ]
-        temp_df.index = pd.to_datetime(temp_df["日期"])
-        temp_df.reset_index(inplace=True, drop=True)
-
-        numeric_cols = [
-            "开盘", "收盘", "最高", "最低", "成交量",
-            "成交额", "振幅", "涨跌幅", "涨跌额", "换手率"
-        ]
-        temp_df[numeric_cols] = temp_df[numeric_cols].apply(pd.to_numeric, errors="coerce")
-        return temp_df
-    except requests.RequestException as e:
-        logging.error(f"请求出错: {e}，状态码：{r.status_code if 'r' in locals() else '未知'}，响应内容：{r.text if 'r' in locals() else '未知'}")
-        return pd.DataFrame()
-    except KeyError as e:
-        logging.error(f"解析数据出错: {e}，响应数据：{data_json if 'data_json' in locals() else '未知'}")
-        return pd.DataFrame()
-
 
 
 ########################################
@@ -949,8 +704,8 @@ def index_zh_a_spot_em() -> pd.DataFrame:
         "_": "1623833739532",
     }
     try:
-        temp_df = index_spot_data(url,params,page_size,"pn").replace({np.nan: None}) # 将数据中NaN空数据进行替换：替换np.nan为None
-
+        # temp_df = index_spot_data(url,params,page_size,"pn").replace({np.nan: None}) # 将数据中NaN空数据进行替换：替换np.nan为None
+        temp_df = index_spot_data(url,params,page_size,"pn")
         # ==== 智能数值列转换 ====
         numeric_cols = [
             'f2','f3','f4','f5','f6','f7','f8','f9','f10','f11',
@@ -990,12 +745,13 @@ def index_zh_a_spot_em() -> pd.DataFrame:
 
         # 获取上证交易所日历
         sh_cal = mcal.get_calendar('SSE')
-        latest_trade_date = sh_cal.schedule(start_date='2022-01-01', end_date=pd.Timestamp.today()).index[-1].strftime("%Y-%m-%d")
+        latest_trade_date = sh_cal.schedule(start_date='2020-01-01', end_date=pd.Timestamp.today()).index[-1].strftime("%Y-%m-%d")
         # print(f"最后的交易日期：{latest_trade_date}")
         temp_df.loc[:, "date"] = latest_trade_date
         # print(f'实时指数数据主表{temp_df}')
 
-
+        temp_df = temp_df.loc[temp_df['new_price'].apply(is_open)]
+        temp_df = temp_df.replace({np.nan: None}) 
          # ==== 主表（cn_etf_spot）写入逻辑 ====
         try:
             # 1. 创建表（如果不存在）
@@ -1035,9 +791,15 @@ def index_zh_a_spot_em() -> pd.DataFrame:
 
 
         # 手动设置固定日期（例如 1212-12-12）做索引使用
-        fixed_date = "1212-12-12"
+        # fixed_date = "1212-12-12"
+        fixed_date = latest_trade_date
         index_info_df = temp_df[existing_columns].copy()  # 显式创建独立副本
         index_info_df.loc[:, "date"] = fixed_date  # 使用 .loc 进行安全赋值
+        if "market_id" in index_info_df.columns and "code" in index_info_df.columns:
+            index_info_df.loc[:, "code_market"] = (
+                index_info_df["market_id"].astype(str) + "." +
+                index_info_df["code"].astype(str).str.zfill(6)
+            )
         print(f"[Success] index_info_df：{index_info_df}")
 
          # ==== 主表（cn_stock_spot）写入逻辑 ====
@@ -1145,9 +907,10 @@ sql语句生成器(table_name,data)：带入参数数据表名和数据，生成
 execute_raw_sql(sql,params)：执行插入数据表
 """
 
+#例句
 def fetch_and_format_stock_info(sql):
-    """执行SQL查询并格式化输出code_str.code_id"""
-    sql = "SELECT code_id, code_str FROM cn_stock_info"
+    """执行SQL查询并格式化输出code_int.market_id"""
+    sql = "SELECT market_id, code FROM cn_stock_info"
     conn = DBManager.get_new_connection()
     if not conn:
         print("数据库连接失败")
@@ -1158,11 +921,11 @@ def fetch_and_format_stock_info(sql):
         cursor.execute(sql)
         results = cursor.fetchall()
         
-        # 格式化为 code_str.code_id
+        # 格式化为 code.market_id
         formatted_results = [
-            f"{row['code_str']}.{row['code_id']}"
+            f"{row['code']}.{row['market_id']}"
             for row in results
-            if 'code_str' in row and 'code_id' in row
+            if 'code' in row and 'market_id' in row
         ]
         
         # 打印结果（或根据需求保存到文件）
@@ -1218,8 +981,8 @@ def create_table_if_not_exists(table_name):
     create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS `{table_name}` (
             `date` DATE,
-            `code_str` VARCHAR(6),
-            `code` INT,
+            `code_int` INT,
+            `code` VARCHAR(6),
             `name` VARCHAR(20)
         );
     """
@@ -1257,7 +1020,7 @@ def create_table_if_not_exists(table_name):
 
     # 添加索引
     create_index("idx_date_code", ["date", "code"], is_unique=True)
-    create_index("idx_code_str", ["code_str"])
+    create_index("idx_code_int", ["code_int"])
     create_index("idx_date", ["date"])
 
 
@@ -1267,18 +1030,18 @@ def 同步表结构(conn, table_name, data_columns):
         cursor = conn.cursor(buffered=True)
         
         # 调试：打印基本信息
-        print(f"\n[DEBUG] 开始同步表结构：{table_name}")
-        print(f"[DEBUG] 数据列要求字段：{data_columns}")
+        # print(f"\n[DEBUG] 开始同步表结构：{table_name}")
+        # print(f"[DEBUG] 数据列要求字段：{data_columns}")
 
         # 获取现有字段
         cursor.execute(f"DESCRIBE `{table_name}`;")
         existing_columns = [row[0] for row in cursor.fetchall()]
-        print(f"[DEBUG] 数据库现有字段：{existing_columns}")
+        # print(f"[DEBUG] 数据库现有字段：{existing_columns}")
 
         # 获取配置表字段
         table_config = tbs.TABLE_REGISTRY.get(table_name, {})
         all_required_columns = list(table_config.get('columns', {}).keys())
-        print(f"[DEBUG] 配置表要求字段：{all_required_columns}")
+        # print(f"[DEBUG] 配置表要求字段：{all_required_columns}")
 
         # 遍历处理字段
         for col in data_columns:
@@ -1296,7 +1059,7 @@ def 同步表结构(conn, table_name, data_columns):
                         print(f"[EXECUTE] 执行SQL：{alter_sql}")
                         
                         cursor.execute(alter_sql)
-                        print(f"[SUCCESS] 字段 {col} 添加成功")
+                        # print(f"[SUCCESS] 字段 {col} 添加成功")
                     else:
                         print(f"[WARNING] 字段 {col} 不在配置表中，已跳过")
                 else:
@@ -1326,9 +1089,9 @@ def sql语句生成器(table_name, data):
     # 准备模板
     # 
     # 
-    # 预处理数据（如添加code_str）
-    if 'code' in data.columns and 'code_str' not in data.columns:
-        data.insert(0, 'code_str', data['code'].astype(str).str.zfill(6))
+    # 预处理数据（如添加code_int）
+    if 'code' in data.columns and 'code_int' not in data.columns:
+        data.insert(0, 'code_int', data['code'].astype(int))
 
     sql_template = """INSERT INTO `{table_name}` ({columns}) 
         VALUES {values} 
@@ -1409,57 +1172,7 @@ def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=5000)
             cursor.close()
             connection.close()
 
-
-
 def main():
-    if len(sys.argv) == 1:
-        # 没有传入日期参数，使用当前日期
-        date = datetime.datetime.now()
-        dates = [date]
-    elif len(sys.argv) == 2:
-        # 传入单个日期
-        date_str = sys.argv[1]
-        date = datetime.datetime.strptime(date_str, "%Y-%m-%d")
-        dates = [date]
-    elif len(sys.argv) == 3:
-        # 传入日期区间
-        start_date_str = sys.argv[1]
-        end_date_str = sys.argv[2]
-        start_date = datetime.datetime.strptime(start_date_str, "%Y-%m-%d")
-        end_date = datetime.datetime.strptime(end_date_str, "%Y-%m-%d")
-        dates = []
-        current_date = start_date
-        while current_date <= end_date:
-            dates.append(current_date)
-            current_date += timedelta(days=1)
-    else:
-        print("参数格式错误，请使用以下格式：")
-        print("单个日期：python basic_date_job.py 2024-04-02")
-        print("日期区间：python basic_date_job.py 2024-04-02 2024-04-05")
-        return
-
-    # 最新选股器，沪深全数据(获取最后的一个交易日结束时间)
-    stock_selection()
-    # 实时股票(获取最近的一个交易日时间)
-    stock_zh_a_spot_em()
-    # 实时ETF基金
-    etf_spot_em()
-    # 实时指数
-    index_zh_a_spot_em()
-
-    # for date in dates:
-    #     prepare(date)
-    #     guess_buy(date)
-    #     guess_sell(date)
-
-
-
-
-
-# main函数入口
-if __name__ == '__main__':
-    # main()
-
     # 最新选股器，沪深全数据 OK
     stock_selection()
 
@@ -1471,6 +1184,25 @@ if __name__ == '__main__':
 
     # 实时指数 OK
     index_zh_a_spot_em()
+
+
+
+
+# main函数入口
+if __name__ == '__main__':
+    main()
+
+    # 最新选股器，沪深全数据 OK
+    # stock_selection()
+
+    # 实时股票 OK
+    # stock_zh_a_spot_em()
+
+    # 实时ETF基金 OK
+    # etf_spot_em()
+
+    # 实时指数 OK
+    # index_zh_a_spot_em()
 
     # 历史日周月股票 OK
     # fetch_all_stock_hist()
