@@ -19,6 +19,7 @@ import mysql.connector
 import instock.core.tablestructure as tbs
 import instock.lib.database as mdb
 import pandas_market_calendars as mcal
+import pytz
 from mysql.connector import Error
 from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
@@ -52,8 +53,9 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code_str, code_id, name FROM cn_stock_info", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_stock_info", conn)
     conn.close()
+
 
     # 准备数据容器
     daily_data = pd.DataFrame()
@@ -61,17 +63,17 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
     monthly_data = pd.DataFrame()
 
     # 多线程获取数据
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor(max_workers=20) as executor:
         futures = []
         for _, row in stock_df.iterrows():
-            code_str = row['code_str']
-            code_id = row['code_id']
+            code = row['code']
+            market_id = row['market_id']
             name = row['name']
             for period in ["daily", "weekly", "monthly"]:
                 futures.append(
                     executor.submit(
                         fetch_single_hist,
-                        code_str, code_id, period, name, "stock", beg, end
+                        code, market_id, period, name, "stock", beg, end
                     )
                 )
 
@@ -125,7 +127,7 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code_str, code_id, name FROM cn_etf_info", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_etf_info", conn)
     conn.close()
 
     # 准备数据容器
@@ -134,17 +136,17 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
     monthly_data = pd.DataFrame()
 
     # 多线程获取数据
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor() as executor:
         futures = []
         for _, row in stock_df.iterrows():
-            code_str = row['code_str']
-            code_id = row['code_id']
+            code = row['code']
+            market_id = row['market_id']
             name = row['name']
             for period in ["daily", "weekly", "monthly"]:
                 futures.append(
                     executor.submit(
                         fetch_single_hist,
-                        code_str, code_id, period, name, "stock", beg, end
+                        code, market_id, period, name, "stock", beg, end
                     )
                 )
 
@@ -198,7 +200,7 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code_str, code_id, name FROM cn_index_info", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_index_info", conn)
     conn.close()
 
     # 准备数据容器
@@ -207,17 +209,17 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
     monthly_data = pd.DataFrame()
 
     # 多线程获取数据
-    with ThreadPoolExecutor(max_workers=10) as executor:
+    with ThreadPoolExecutor() as executor:
         futures = []
         for _, row in stock_df.iterrows():
-            code_str = row['code_str']
-            code_id = row['code_id']
+            code = row['code']
+            market_id = row['market_id']
             name = row['name']
             for period in ["daily", "weekly", "monthly"]:
                 futures.append(
                     executor.submit(
                         fetch_single_hist,
-                        code_str, code_id, period, name, "stock", beg, end
+                        code, market_id, period, name, "stock", beg, end
                     )
                 )
 
@@ -253,7 +255,7 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
     print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
 
 
-def fetch_single_hist(code_str: str, code_id: str, period: str, name: str, data_type: str, beg: str, end: str):
+def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_type: str, beg: str, end: str):
     """通用函数：获取单个代码的历史数据（股票/ETF/指数）"""
     try:
         url = "http://push2his.eastmoney.com/api/qt/stock/kline/get"
@@ -269,11 +271,11 @@ def fetch_single_hist(code_str: str, code_id: str, period: str, name: str, data_
         # 请求参数（ut 统一使用一个值，如原股票/ETF的ut）
         params = {
             "fields1": "f1,f2,f3,f4,f5,f6",
-            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61,f116",
-            "ut": "7eea3edcaed734bea9cbfc24409ed989",  # 统一使用股票/ETF的ut
+            "fields2": "f51,f52,f53,f54,f55,f56,f57,f58,f59,f60,f61",
+            "ut": "fa5fd1943c7b386f172d6893dbfba10b",  # 统一使用股票/ETF的ut
             "klt": {'daily':101, 'weekly':102, 'monthly':103}[period],
             "fqt": 0,
-            "secid": f"{code_id}.{code_str}",
+            "secid": f"{market_id}.{code}",
             # "beg": "20200101",
             # "end": datetime.datetime.now().strftime("%Y%m%d"),
             "beg": beg,  # 使用传入的beg
@@ -300,14 +302,14 @@ def fetch_single_hist(code_str: str, code_id: str, period: str, name: str, data_
         df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
         df.rename(columns=en_name, inplace=True)
         df['date'] = pd.to_datetime(df['date'])
-        df['code'] = code_str
-        df['code_str'] = code_str
+        df['code'] = code
+        df['code_int'] = code
         df['period'] = period
         df['name'] = name
         
         return {'period': period, 'df': df, 'df_columns': df.columns}
     except Exception as e:
-        print(f"获取{code_str} {period}数据失败: {str(e)}")
+        print(f"获取{code} {period}数据失败: {str(e)}")
         return None
 
 
@@ -361,8 +363,8 @@ def create_table_if_not_exists(table_name):
     create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS `{table_name}` (
             `date` DATE,
-            `code_str` VARCHAR(6),
-            `code` INT,
+            `code` VARCHAR(6),
+            `code_int` INT,
             `name` VARCHAR(20)
         );
     """
@@ -400,7 +402,7 @@ def create_table_if_not_exists(table_name):
 
     # 添加索引
     create_index("idx_date_code", ["date", "code"], is_unique=True)
-    create_index("idx_code_str", ["code_str"])
+    create_index("idx_code_int", ["code_int"])
     create_index("idx_date", ["date"])
 
 
@@ -436,7 +438,7 @@ def 同步表结构(conn, table_name, data_columns):
                         
                         # 执行添加字段
                         alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col}` {sql_type};"
-                        # print(f"[EXECUTE] 执行SQL：{alter_sql}")
+                        print(f"[EXECUTE] 执行SQL：{alter_sql}")
                         
                         cursor.execute(alter_sql)
                         # print(f"[SUCCESS] 字段 {col} 添加成功")
@@ -469,9 +471,9 @@ def sql语句生成器(table_name, data):
     # 准备模板
     # 
     # 
-    # 预处理数据（如添加code_str）
-    if 'code' in data.columns and 'code_str' not in data.columns:
-        data.insert(0, 'code_str', data['code'].astype(str).str.zfill(6))
+    # 预处理数据（如添加code）
+    if 'code' in data.columns and 'code' not in data.columns:
+        data.insert(0, 'code', data['code'].astype(str).str.zfill(6))
 
     sql_template = """INSERT INTO `{table_name}` ({columns}) 
         VALUES {values} 
@@ -568,38 +570,97 @@ def convert_date_format(input_date: str) -> str:
             raise ValueError(f"无效的日期格式：{input_date}，请输入 yyyy-mm-dd 或 yyyymmdd 格式")
 
 
-# main函数入口
-if __name__ == '__main__':
+
+
+# 新增函数：交易日判断逻辑
+def get_shanghai_calendar():
+    """获取上证交易所日历"""
+    return mcal.get_calendar('SSE')
+
+def is_trading_day(date: datetime.datetime) -> bool:
+    """判断单个日期是否为交易日"""
+    calendar = get_shanghai_calendar()
+    date_str = date.strftime('%Y-%m-%d')
+    schedule = calendar.schedule(start_date=date_str, end_date=date_str)
+    return not schedule.empty
+
+def is_within_trading_hours(now=None):
+    """判断当前时间是否在交易时段内（收盘后视为有效）"""
+    tz = pytz.timezone('Asia/Shanghai')
+    now = now or datetime.datetime.now(tz)
+    
+    # 判断是否为交易日
+    if not is_trading_day(now):
+        return False
+    
+    # 判断是否在收盘时间后（15:00后视为收盘）
+    market_close = now.replace(hour=15, minute=0, second=0, microsecond=0)
+    return now >= market_close
+
+def is_valid_trading_period(start_date: str, end_date: str) -> bool:
+    """验证日期区间是否包含有效交易日"""
+    calendar = get_shanghai_calendar()
+    schedule = calendar.schedule(start_date=start_date, end_date=end_date)
+    return not schedule.empty
+
+# 修改后的main函数
+def main():
+    sh_tz = pytz.timezone('Asia/Shanghai')
+    
+    # 场景1: 无参数（自动判断当天）
     if len(sys.argv) == 1:
-        # 无参数：使用当天日期
-        today = datetime.datetime.now().strftime("%Y%m%d")
+        now = datetime.datetime.now(sh_tz)
+        if not is_within_trading_hours(now):
+            print(f"[{now.strftime('%Y-%m-%d %H:%M')}] 非交易时段，终止执行")
+            return
+        today = now.strftime("%Y%m%d")
         fetch_all_stock_hist(today, today)
         fetch_all_etf_hist(today, today)
         fetch_all_index_hist(today, today)
+    
+    # 场景2: 单日期模式
     elif len(sys.argv) == 2:
-        # 单日期模式
         date_str = sys.argv[1]
         try:
-            beg = convert_date_format(date_str)
-            end = beg
-            fetch_all_stock_hist(beg, end)
-            fetch_all_etf_hist(beg, end)
-            fetch_all_index_hist(beg, end)
+            clean_date = convert_date_format(date_str)
+            dt = sh_tz.localize(datetime.datetime.strptime(clean_date, "%Y%m%d"))
+            
+            if not is_trading_day(dt):
+                print(f"[{date_str}] 非交易日，终止执行")
+                return
+                
+            fetch_all_stock_hist(clean_date, clean_date)
+            fetch_all_etf_hist(clean_date, clean_date)
+            fetch_all_index_hist(clean_date, clean_date)
+            
         except ValueError as e:
-            print(f"错误：{e}")
+            print(f"日期格式错误：{e}")
+    
+    # 场景3: 日期区间模式
     elif len(sys.argv) == 3:
-        # 日期区间模式
-        beg_str, end_str = sys.argv[1], sys.argv[2]
         try:
-            beg = convert_date_format(beg_str)
-            end = convert_date_format(end_str)
-            fetch_all_stock_hist(beg, end)
-            fetch_all_etf_hist(beg, end)
-            fetch_all_index_hist(beg, end)
+            beg_str = convert_date_format(sys.argv[1])
+            end_str = convert_date_format(sys.argv[2])
+            
+            if not is_valid_trading_period(beg_str, end_str):
+                print(f"[{beg_str}-{end_str}] 区间无交易日，终止执行")
+                return
+                
+            # fetch_all_stock_hist(beg_str, end_str)
+            fetch_all_etf_hist(beg_str, end_str)
+            # fetch_all_index_hist(beg_str, end_str)
+            
         except ValueError as e:
-            print(f"错误：{e}")
+            print(f"日期格式错误：{e}")
+    
     else:
         print("参数错误！支持以下调用方式：")
-        print("1. 无参数       -> 使用当天日期")
+        print("1. 无参数       -> 自动判断当天交易时段")
         print("2. 单日期       -> python script.py 2023-01-01")
         print("3. 日期区间     -> python script.py 2023-01-01 2023-01-05")
+
+
+# main函数入口
+if __name__ == '__main__':
+    main()
+
