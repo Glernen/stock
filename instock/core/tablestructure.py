@@ -497,7 +497,8 @@ STOCK_STATS_DATA = {'name': 'calculate_indicator', 'cn': '股票统计/指标计
 TABLE_CN_STOCK_FOREIGN_KEY = {'name': 'cn_stock_foreign_key', 'cn': '股票外键',
                               'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
                                           'code': {'type': INT, 'cn': '代码', 'size': 10},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
+                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
+                                          'code_str': {'type': INT, 'cn': '代码', 'size': 70, 'en': 'code'}}}
 
 TABLE_CN_STOCK_INDICATORS = {'name': 'cn_stock_indicators', 'cn': '股票指标数据',
                              'columns': TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()}

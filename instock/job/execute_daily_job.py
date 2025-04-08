@@ -20,7 +20,8 @@ logging.basicConfig(format='%(asctime)s %(message)s', filename=os.path.join(log_
 logging.getLogger().setLevel(logging.INFO)
 import init_job as bj
 import basic_data_daily_job as hdj
-import basic_data as bd
+import basic_data as basic_data
+import basic_hist_data as basic_hist_data
 import basic_data_other_daily_job as hdtj
 import basic_data_after_close_daily_job as acdj
 import indicators_data_daily_job as gdj
@@ -30,6 +31,7 @@ import klinepattern_data_daily_job as kdj
 import selection_data_daily_job as sddj
 import indicators_etf_data_daily_job as ieddj
 import indicators_index_data_daily_job as iiddj
+import indicators_data_daily as indicators_data_daily
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -42,22 +44,31 @@ def main():
     # 第1.1步创建数据库
     bj.main()
     # 第1.2步创建数据库
-    bd.main()
+
+    # 获取实时股票、基金、指数数据并同时创建和写入数据主表，数据基础表
+    basic_data.main()
+    
+    # 通过数据基础表，获取所有股票、基金、指数的历史日、周、月行情数据，并同时创建和写入历史数据主表
+    basic_hist_data.main()
+
+    # 通过数据基础表，获取历史数据表中个股数据，计算所有股票、基金、指数的日行情指标，并同时创建和写入日行情指标主表
+    indicators_data_daily.main()
+
     # 第2.1步创建股票基础数据表
     # hdj.main()
     # 第2.2步创建综合股票数据表
     # sddj.main()
     with concurrent.futures.ThreadPoolExecutor() as executor:
         # # 第3.1步创建股票其它基础数据表
-        executor.submit(hdtj.main)
+        # executor.submit(hdtj.main)
         # # 第3.2步创建股票指标数据表
-        executor.submit(gdj.main)
+        # executor.submit(gdj.main)
         # # 第3.3步创建ETF指标数据表
-        executor.submit(ieddj.main)
+        # executor.submit(ieddj.main)
         # # 第3.4步创建指数指标数据表
-        executor.submit(iiddj.main)
+        # executor.submit(iiddj.main)
         # # # # 第4步创建股票k线形态表
-        executor.submit(kdj.main)
+        # executor.submit(kdj.main)
         # # # # 第5步创建股票策略数据表
         executor.submit(sdj.main)
 

@@ -18,7 +18,6 @@ import instock.core.crawling.stock_dzjy_em as sde
 import instock.core.crawling.stock_hist_em as she
 import instock.core.crawling.stock_fund_em as sff
 import instock.core.crawling.stock_fhps_em as sfe
-import instock.lib.database as mdb
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -71,46 +70,7 @@ def fetch_stocks_trade_date():
     return None
 
 
-"""
-# 读取当天基金数据并插入数据库
-def fetch_etfs(date):
-    try:
-        data = fee.fund_etf_spot_em()
-        if data is None or len(data.index) == 0:
-            logging.error(f"数据源返回空值，日期: {date}")
-            return None
-        if date is None:
-            data.insert(0, 'date', datetime.datetime.now().strftime("%Y-%m-%d"))
-        else:
-            data.insert(0, 'date', date.strftime("%Y-%m-%d"))
-        data.columns = list(tbs.TABLE_CN_ETF_SPOT['columns'])
-        __data = data.loc[data['new_price'].apply(is_open)]
-
-        table_name = tbs.TABLE_CN_ETF_SPOT['name']
-        cols_type = tbs.get_field_types(tbs.TABLE_CN_ETF_SPOT['columns'])
-
-        # 处理数据中的 nan 值，将其替换为 None
-        data = data.where(pd.notnull(__data), None)
-
-        for index, row in data.iterrows():
-            columns = ', '.join(row.index)
-            placeholders = ', '.join(['%s'] * len(row))
-            insert_sql = f"INSERT INTO `{table_name}` ({columns}) VALUES ({placeholders})"
-            update_clause = ', '.join([f"`{col}` = VALUES(`{col}`)" for col in row.index if col not in ['date', 'code']])
-            upsert_sql = f"{insert_sql} ON DUPLICATE KEY UPDATE {update_clause}"
-            values = tuple(row)
-            try:
-                mdb.executeSql(upsert_sql, values)
-            except Exception as insert_error:
-                logging.error(f"插入 {row['code']} 数据时出错: {insert_error}")
-
-        # print(f"fetch_etfs.data：{data}")
-        return __data
-    except Exception as e:
-        logging.error(f"stockfetch.fetch_etfs处理异常：{e}")
-    return None
-
-"""
+# 读取当天股票数据
 def fetch_etfs(date):
     try:
         data = fee.fund_etf_spot_em()
@@ -122,12 +82,10 @@ def fetch_etfs(date):
             data.insert(0, 'date', date.strftime("%Y-%m-%d"))
         data.columns = list(tbs.TABLE_CN_ETF_SPOT['columns'])
         data = data.loc[data['new_price'].apply(is_open)]
-        print(f"fetch_etfs.data：{data}")
         return data
     except Exception as e:
         logging.error(f"stockfetch.fetch_etfs处理异常：{e}")
     return None
-
 
 
 # 读取当天股票数据
@@ -283,37 +241,7 @@ def fetch_stock_blocktrade_data(date):
     return None
 
 
-# 读取基金历史数据
-"""
-def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
-    try:
-        # 解包数据
-        date, code = data_base[0], data_base[1]
-
-        # 获取 date_end
-        if date_start is None:
-            date_start, is_cache = trd.get_trade_hist_interval(date)
-            # date_start = date_start.strftime("%Y%m%d")
-
-        # print(f"读取基金历史数据的时间： {date_start},{date_end}  ")
-        data = fee.fund_etf_hist_em(symbol=code, period="daily", start_date=date_start, end_date=date_end, adjust="qfq")
-        # print(f"读取基金历史数据 {data} ")
-        '''在给 DataFrame 赋列名之前，先检查 DataFrame 是否为空。如果为空，则直接返回 None 或者一个空的 DataFrame，避免赋值列名操作引发错误。'''
-        if data is not None and not data.empty:  # 检查 DataFrame 是否为空
-            data.columns = tuple(tbs.CN_STOCK_HIST_DATA['columns'])
-            data = data.sort_index()  # 将数据按照日期排序
-            data.loc[:, 'p_change'] = tl.ROC(data['close'].values, 1)
-            data['p_change'].values[np.isnan(data['p_change'].values)] = 0.0
-            data["volume"] = data['volume'].values.astype('double') * 100  # 成交量单位从手变成股。
-        else:
-            return None  # 如果数据为空，直接返回 None
-
-        return data
-    except Exception as e:
-        logging.error(f"stockfetch.fetch_etf_hist处理异常：{e}")
-    return None
-
-"""
+# 读取股票历史数据
 def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
     date = data_base[0]
     code = data_base[1]
@@ -339,7 +267,6 @@ def fetch_etf_hist(data_base, date_start=None, date_end=None, adjust='qfq'):
     except Exception as e:
         logging.error(f"stockfetch.fetch_etf_hist处理异常：{e}")
     return None
-
 
 
 # 读取股票历史数据
