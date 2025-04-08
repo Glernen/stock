@@ -53,7 +53,7 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_stock_info", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_stock_info WHERE date = (SELECT MAX(date) FROM cn_stock_info WHERE code = '000001')", conn)
     conn.close()
 
 
@@ -127,7 +127,7 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_etf_info", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_etf_info WHERE date = (SELECT MAX(date) FROM cn_etf_info WHERE code = '159001')", conn)
     conn.close()
 
     # 准备数据容器
@@ -200,7 +200,7 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_index_info", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_index_info WHERE date = (SELECT MAX(date) FROM cn_index_info WHERE code = '000001')", conn)
     conn.close()
 
     # 准备数据容器
@@ -445,7 +445,8 @@ def 同步表结构(conn, table_name, data_columns):
                     else:
                         print(f"[WARNING] 字段 {col} 不在配置表中，已跳过")
                 else:
-                    print(f"[INFO] 字段 {col} 已存在，无需添加")
+                    pass
+                    # print(f"[INFO] 字段 {col} 已存在，无需添加")
             except Exception as col_error:
                 print(f"[ERROR] 处理字段 {col} 时发生错误：{str(col_error)}")
                 conn.rollback()  # 回滚当前字段操作
@@ -646,9 +647,9 @@ def main():
                 print(f"[{beg_str}-{end_str}] 区间无交易日，终止执行")
                 return
                 
-            # fetch_all_stock_hist(beg_str, end_str)
+            fetch_all_stock_hist(beg_str, end_str)
             fetch_all_etf_hist(beg_str, end_str)
-            # fetch_all_index_hist(beg_str, end_str)
+            fetch_all_index_hist(beg_str, end_str)
             
         except ValueError as e:
             print(f"日期格式错误：{e}")
