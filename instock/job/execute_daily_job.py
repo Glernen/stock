@@ -20,8 +20,6 @@ logging.basicConfig(format='%(asctime)s %(message)s', filename=os.path.join(log_
 logging.getLogger().setLevel(logging.INFO)
 import init_job as bj
 import basic_data_daily_job as hdj
-import basic_data as basic_data
-import basic_hist_data as basic_hist_data
 import basic_data_other_daily_job as hdtj
 import basic_data_after_close_daily_job as acdj
 import indicators_data_daily_job as gdj
@@ -29,8 +27,8 @@ import strategy_data_daily_job as sdj
 import backtest_data_daily_job as bdj
 import klinepattern_data_daily_job as kdj
 import selection_data_daily_job as sddj
-import indicators_etf_data_daily_job as ieddj
-import indicators_index_data_daily_job as iiddj
+import basic_data as basic_data
+import basic_hist_data as basic_hist_data
 import indicators_data_daily as indicators_data_daily
 
 __author__ = 'myh '
@@ -58,7 +56,7 @@ def main():
     # hdj.main()
     # 第2.2步创建综合股票数据表
     # sddj.main()
-    with concurrent.futures.ThreadPoolExecutor() as executor:
+    # with concurrent.futures.ThreadPoolExecutor() as executor:
         # # 第3.1步创建股票其它基础数据表
         # executor.submit(hdtj.main)
         # # 第3.2步创建股票指标数据表
@@ -70,7 +68,7 @@ def main():
         # # # # 第4步创建股票k线形态表
         # executor.submit(kdj.main)
         # # # # 第5步创建股票策略数据表
-        executor.submit(sdj.main)
+        # executor.submit(sdj.main)
 
     # # # # 第6步创建股票回测
     bdj.main()

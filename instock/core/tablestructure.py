@@ -9,7 +9,7 @@ cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
 
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, INT, DATETIME
-from sqlalchemy.dialects.mysql import BIT
+from sqlalchemy.dialects.mysql import TINYINT
 import talib as tl
 from instock.core.strategy import enter
 from instock.core.strategy import turtle_trade
@@ -36,10 +36,12 @@ TABLE_STOCK_INIT = {
     'name': 'cn_stock_info',
     'cn': '股票初始表',
     'columns': {
-        # 'date': {'type': DATE, 'cn': '更新日期', 'size': 0, 'en': 'date'},
+        'date': {'type': DATE, 'cn': '更新日期', 'size': 70, 'en': 'date'},
         'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code'},
-        'code_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'code_id'}
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+        'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
+        'market_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'market_id'},
+        'code_market': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '股票标识', 'size': 120, 'en': 'code_market'}
     }
 }
 
@@ -48,10 +50,12 @@ TABLE_ETF_INIT = {
     'name': 'cn_etf_info',
     'cn': '基金初始表',
     'columns': {
-        # 'date': {'type': DATE, 'cn': '更新日期', 'size': 0, 'en': 'date'},
+        'date': {'type': DATE, 'cn': '更新日期', 'size': 70, 'en': 'date'},
         'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code'},
-        'code_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'code_id'}
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+        'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
+        'market_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'market_id'},
+        'code_market': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '股票标识', 'size': 120, 'en': 'code_market'}
     }
 }
 
@@ -60,17 +64,19 @@ TABLE_INDEX_INIT = {
     'name': 'cn_index_info',
     'cn': '指数初始表',
     'columns': {
-        # 'date': {'type': DATE, 'cn': '更新日期', 'size': 0, 'en': 'date'},
+        'date': {'type': DATE, 'cn': '更新日期', 'size': 70, 'en': 'date'},
         'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code'},
-        'code_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'code_id'}
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+        'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
+        'market_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'market_id'},
+        'code_market': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '股票标识', 'size': 120, 'en': 'code_market'}
     }
 }
 
 
 TABLE_CN_STOCK_ATTENTION = {'name': 'cn_stock_attention', 'cn': '我的关注',
                             'columns': {'datetime': {'type': DATETIME, 'cn': '日期', 'size': 0, 'en': 'datetime'},
-                            'code': {'type': INT, 'cn': '代码', 'size': 10, 'en': 'code'}}}
+                            'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'}}}
 
 TABLE_CN_ETF_SPOT = {
     'name': 'cn_etf_spot',
@@ -79,7 +85,7 @@ TABLE_CN_ETF_SPOT = {
         'date': {'map': None, 'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'},
         'code': {'map': 'f12',  'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60, 'en': 'code'},
         'name': {'map': 'f14', 'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 10,  'en': 'code_id'},
+        'market_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 10,  'en': 'market_id'},
         'new_price': {'map': 'f2', 'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
         'change_rate': {'map': 'f3',  'type': FLOAT, 'cn': '涨跌幅', 'size': 70, 'en': 'change_rate'},
         'ups_downs': {'map': 'f4',  'type': FLOAT, 'cn': '涨跌额', 'size': 70, 'en': 'ups_downs'},
@@ -102,7 +108,7 @@ TABLE_CN_INDEX_SPOT = {
         'date': {'map': None, 'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'},
         'code': {'map': 'f12',  'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60, 'en': 'code'},
         'name': {'map': 'f14', 'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 10,  'en': 'code_id'},
+        'market_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 10,  'en': 'market_id'},
         'new_price': {'map': 'f2', 'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
         'change_rate': {'map': 'f3',  'type': FLOAT, 'cn': '涨跌幅', 'size': 70, 'en': 'change_rate'},
         'ups_downs': {'map': 'f4',  'type': FLOAT, 'cn': '涨跌额', 'size': 70, 'en': 'ups_downs'},
@@ -122,10 +128,10 @@ TABLE_CN_STOCK_SPOT = {
     'name': 'cn_stock_spot',
     'cn': '每日股票数据',
     'columns': {
-        'date': {'type': DATE, 'cn': '日期', 'size': 0, 'map': None, 'en': 'date'},
-        'code': {'type': INT, 'cn': '代码', 'size': 10, 'map': 'f12', 'en': 'code'},
-        'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'map': 'f14', 'en': 'name'},
-        'code_id':{'type': INT, 'cn': '市场标识', 'size': 10, 'map': 'f13', 'en': 'code_id'},
+        # 'date': {'type': DATE, 'cn': '日期', 'size': 0, 'map': None, 'en': 'date'},
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'map': 'f12', 'en': 'code'},
+        'name': {'type': VARCHAR(20, _COLLATE), 'cn': '代码', 'size': 70, 'map': 'f14', 'en': 'name'},
+        'market_id':{'type': INT, 'cn': '市场标识', 'size': 10, 'map': 'f13', 'en': 'market_id'},
         'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'map': 'f2', 'en': 'new_price'},
         'change_rate': {'type': FLOAT, 'cn': '涨跌幅', 'size': 70, 'map': 'f3', 'en': 'change_rate'},
         'ups_downs': {'type': FLOAT, 'cn': '涨跌额', 'size': 70, 'map': 'f4', 'en': 'ups_downs'},
@@ -173,7 +179,7 @@ TABLE_CN_STOCK_SPOT_BUY = {'name': 'cn_stock_spot_buy', 'cn': '基本面选股',
                            'columns': TABLE_CN_STOCK_SPOT['columns'].copy()}
 
 CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日',
-                       'columns': {'code': {'type': INT, 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate': {'type': FLOAT, 'cn': '今日涨跌幅', 'size': 70, 'en': 'change_rate'},
@@ -188,7 +194,7 @@ CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日'
                                    'fund_amount_small': {'type': BIGINT, 'cn': '今日小单净流入-净额', 'size': 100, 'en': 'fund_amount_small'},
                                    'fund_rate_small': {'type': FLOAT, 'cn': '今日小单净流入-净占比', 'size': 70, 'en': 'fund_rate_small'}}},
                       {'name': 'stock_individual_fund_flow_rank', 'cn': '3日',
-                       'columns': {'code': {'type': INT, 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate_3': {'type': FLOAT, 'cn': '3日涨跌幅', 'size': 70, 'en': 'change_rate_3'},
@@ -203,7 +209,7 @@ CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日'
                                    'fund_amount_small_3': {'type': BIGINT, 'cn': '3日小单净流入-净额', 'size': 100, 'en': 'fund_amount_small_3'},
                                    'fund_rate_small_3': {'type': FLOAT, 'cn': '3日小单净流入-净占比', 'size': 70, 'en': 'fund_rate_small_3'}}},
                       {'name': 'stock_individual_fund_flow_rank', 'cn': '5日',
-                       'columns': {'code': {'type': INT, 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate_5': {'type': FLOAT, 'cn': '5日涨跌幅', 'size': 70, 'en': 'change_rate_5'},
@@ -218,7 +224,7 @@ CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日'
                                    'fund_amount_small_5': {'type': BIGINT, 'cn': '5日小单净流入-净额', 'size': 100, 'en': 'fund_amount_small_5'},
                                    'fund_rate_small_5': {'type': FLOAT, 'cn': '5日小单净流入-净占比', 'size': 70, 'en': 'fund_rate_small_5'}}},
                       {'name': 'stock_individual_fund_flow_rank', 'cn': '10日',
-                       'columns': {'code': {'type': INT, 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate_10': {'type': FLOAT, 'cn': '10日涨跌幅', 'size': 70, 'en': 'change_rate_10'},
@@ -294,7 +300,7 @@ for cf in CN_STOCK_SECTOR_FUND_FLOW[1]:
 
 TABLE_CN_STOCK_BONUS = {'name': 'cn_stock_bonus', 'cn': '股票分红配送',
                         'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'},
-                                    'code': {'type': INT, 'cn': '代码', 'size': 10, 'en': 'code'},
+                                    'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
                                     'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                     'convertible_total_rate': {'type': FLOAT, 'cn': '送转股份-送转总比例', 'size': 70, 'en': 'convertible_total_rate'},
                                     'convertible_rate': {'type': FLOAT, 'cn': '送转股份-送转比例', 'size': 70, 'en': 'convertible_rate'},
@@ -315,7 +321,7 @@ TABLE_CN_STOCK_BONUS = {'name': 'cn_stock_bonus', 'cn': '股票分红配送',
 
 TABLE_CN_STOCK_TOP = {'name': 'cn_stock_top', 'cn': '股票龙虎榜',
                       'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                  'code': {'type': INT, 'cn': '代码', 'size': 10},
+                                  'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
                                   'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
                                   'ranking_times': {'type': FLOAT, 'cn': '上榜次数', 'size': 70},
                                   'sum_buy': {'type': FLOAT, 'cn': '累积购买额', 'size': 100},
@@ -326,7 +332,7 @@ TABLE_CN_STOCK_TOP = {'name': 'cn_stock_top', 'cn': '股票龙虎榜',
 
 TABLE_CN_STOCK_BLOCKTRADE = {'name': 'cn_stock_blocktrade', 'cn': '股票大宗交易',
                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                         'code': {'type': INT, 'cn': '代码', 'size': 10},
+                                         'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
                                          'new_price': {'type': FLOAT, 'cn': '收盘价', 'size': 70},
                                          'change_rate': {'type': FLOAT, 'cn': '涨跌幅', 'size': 70},
@@ -342,8 +348,8 @@ TABLE_CN_STOCK_BLOCKTRADE = {'name': 'cn_stock_blocktrade', 'cn': '股票大宗�
 BASE_COLUMNS = {
                 'date':    {'type': DATE,  'cn': '日期', 'en': 'date', 'map': 0, 'size': 70}, 
                 'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-                'code': {'type': INT, 'cn': '代码_int', 'size': 0, 'en': 'code'},
-                'code_str': {'type': INT, 'cn': '代码', 'size': 70, 'en': 'code'},
+                'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
+                'code_int': {'type': INT, 'cn': '代码', 'size': 70, 'en': 'code_int'},
                 'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  # 对应 open_price 的 map: f17
                 'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},   # 对应 new_price 的 map: f2
                 'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70},  # 对应 high_price 的 map: f15
@@ -496,9 +502,8 @@ STOCK_STATS_DATA = {'name': 'calculate_indicator', 'cn': '股票统计/指标计
 
 TABLE_CN_STOCK_FOREIGN_KEY = {'name': 'cn_stock_foreign_key', 'cn': '股票外键',
                               'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': INT, 'cn': '代码', 'size': 10},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
-                                          'code_str': {'type': INT, 'cn': '代码', 'size': 70, 'en': 'code'}}}
+                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
+                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
 
 TABLE_CN_STOCK_INDICATORS = {'name': 'cn_stock_indicators', 'cn': '股票指标数据',
                              'columns': TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()}
@@ -517,7 +522,7 @@ TABLE_CN_STOCK_INDICATORS_SELL = {'name': 'cn_stock_indicators_sell', 'cn': '股
 
 TABLE_CN_ETF_FOREIGN_KEY = {'name': 'cn_etf_foreign_key', 'cn': '基金外键',
                               'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': INT, 'cn': '代码', 'size': 10},
+                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
                                           'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}} 
 
 TABLE_CN_ETF_INDICATORS = {'name': 'cn_etf_indicators', 'cn': 'ETF指标数据',
@@ -537,7 +542,7 @@ TABLE_CN_ETF_INDICATORS_SELL = {'name': 'cn_etf_indicators_sell', 'cn': 'ETF指�
  
 TABLE_CN_INDEX_FOREIGN_KEY = {'name': 'cn_index_foreign_key', 'cn': '指数外键',
                               'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': INT, 'cn': '代码', 'size': 10},
+                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
                                           'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}} 
 INDEX_STATS_DATA = {'name': 'calculate_index_indicator', 'cn': '指标计算助手库',
                     'columns': {'close': {'type': FLOAT, 'cn': '价格', 'size': 0},
@@ -728,7 +733,7 @@ TABLE_CN_STOCK_KLINE_PATTERN['columns'].update(STOCK_KLINE_PATTERN_DATA['columns
 
 TABLE_CN_STOCK_SELECTION = {'name': 'cn_stock_selection', 'cn': '综合选股',
                             'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0, 'map': 'MAX_TRADE_DATE', 'en': 'date'},
-                                        'code': {'type': INT, 'cn': '代码', 'size': 10, 'map': 'SECURITY_CODE', 'en': 'code'},
+                                        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'map': 'SECURITY_CODE', 'en': 'code'},
                                         'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70,'map': 'SECURITY_NAME_ABBR', 'en': 'name'},
                                         'secucode': {'type': VARCHAR(20, _COLLATE), 'cn': '证券代码', 'size': 70,'map': 'SECUCODE', 'en': 'secucode'},
                                         'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'map': 'NEW_PRICE', 'en': 'new_price'},
@@ -865,39 +870,39 @@ TABLE_CN_STOCK_SELECTION = {'name': 'cn_stock_selection', 'cn': '综合选股',
                                                              'map': 'HOLD_RATIO_COUNT', 'en': 'hold_ratio_count'},
                                         'free_hold_ratio': {'type': FLOAT, 'cn': '十大流通股东比例合计', 'size': 70,
                                                              'map': 'FREE_HOLD_RATIO', 'en': 'free_hold_ratio'},
-                                        'macd_golden_fork': {'type': BIT, 'cn': 'MACD金叉日线', 'size': 70,
+                                        'macd_golden_fork': {'type': TINYINT, 'cn': 'MACD金叉日线', 'size': 70,
                                                               'map': 'MACD_GOLDEN_FORK', 'en': 'macd_golden_fork'},
-                                        'macd_golden_forkz': {'type': BIT, 'cn': 'MACD金叉周线', 'size': 70,
+                                        'macd_golden_forkz': {'type': TINYINT, 'cn': 'MACD金叉周线', 'size': 70,
                                                               'map': 'MACD_GOLDEN_FORKZ', 'en': 'macd_golden_forkz'},
-                                        'macd_golden_forky': {'type': BIT, 'cn': 'MACD金叉月线', 'size': 70,
+                                        'macd_golden_forky': {'type': TINYINT, 'cn': 'MACD金叉月线', 'size': 70,
                                                               'map': 'MACD_GOLDEN_FORKY', 'en': 'macd_golden_forky'},
-                                        'kdj_golden_fork': {'type': BIT, 'cn': 'KDJ金叉日线', 'size': 70,
+                                        'kdj_golden_fork': {'type': TINYINT, 'cn': 'KDJ金叉日线', 'size': 70,
                                                             'map': 'KDJ_GOLDEN_FORK', 'en': 'kdj_golden_fork'},
-                                        'kdj_golden_forkz': {'type': BIT, 'cn': 'KDJ金叉周线', 'size': 70,
+                                        'kdj_golden_forkz': {'type': TINYINT, 'cn': 'KDJ金叉周线', 'size': 70,
                                                               'map': 'KDJ_GOLDEN_FORKZ', 'en': 'kdj_golden_forkz'},
-                                        'kdj_golden_forky': {'type': BIT, 'cn': 'KDJ金叉月线', 'size': 70,
+                                        'kdj_golden_forky': {'type': TINYINT, 'cn': 'KDJ金叉月线', 'size': 70,
                                                               'map': 'KDJ_GOLDEN_FORKY', 'en': 'kdj_golden_forky'},
-                                        'break_through': {'type': BIT, 'cn': '放量突破', 'size': 70,
+                                        'break_through': {'type': TINYINT, 'cn': '放量突破', 'size': 70,
                                                           'map': 'BREAK_THROUGH', 'en': 'break_through'},
-                                        'low_funds_inflow': {'type': BIT, 'cn': '低位资金净流入', 'size': 70,
+                                        'low_funds_inflow': {'type': TINYINT, 'cn': '低位资金净流入', 'size': 70,
                                                              'map': 'LOW_FUNDS_INFLOW', 'en': 'low_funds_inflow'},
-                                        'high_funds_outflow': {'type': BIT, 'cn': '高位资金净流出', 'size': 70,
+                                        'high_funds_outflow': {'type': TINYINT, 'cn': '高位资金净流出', 'size': 70,
                                                                'map': 'HIGH_FUNDS_OUTFLOW', 'en': 'high_funds_outflow'},
-                                        'breakup_ma_5days': {'type': BIT, 'cn': '向上突破均线5日', 'size': 70,
+                                        'breakup_ma_5days': {'type': TINYINT, 'cn': '向上突破均线5日', 'size': 70,
                                                              'map': 'BREAKUP_MA_5DAYS', 'en': 'breakup_ma_5days'},
-                                        'breakup_ma_10days': {'type': BIT, 'cn': '向上突破均线10日', 'size': 70,
+                                        'breakup_ma_10days': {'type': TINYINT, 'cn': '向上突破均线10日', 'size': 70,
                                                               'map': 'BREAKUP_MA_10DAYS', 'en': 'breakup_ma_10days'},
-                                        'breakup_ma_20days': {'type': BIT, 'cn': '向上突破均线20日', 'size': 70,
+                                        'breakup_ma_20days': {'type': TINYINT, 'cn': '向上突破均线20日', 'size': 70,
                                                               'map': 'BREAKUP_MA_20DAYS', 'en': 'breakup_ma_20days'},
-                                        'breakup_ma_30days': {'type': BIT, 'cn': '向上突破均线30日', 'size': 70,
+                                        'breakup_ma_30days': {'type': TINYINT, 'cn': '向上突破均线30日', 'size': 70,
                                                               'map': 'BREAKUP_MA_30DAYS', 'en': 'breakup_ma_30days'},
-                                        'breakup_ma_60days': {'type': BIT, 'cn': '向上突破均线60日', 'size': 70,
+                                        'breakup_ma_60days': {'type': TINYINT, 'cn': '向上突破均线60日', 'size': 70,
                                                               'map': 'BREAKUP_MA_60DAYS', 'en': 'breakup_ma_60days'},
-                                        'long_avg_array': {'type': BIT, 'cn': '均线多头排列', 'size': 70,
+                                        'long_avg_array': {'type': TINYINT, 'cn': '均线多头排列', 'size': 70,
                                                            'map': 'LONG_AVG_ARRAY', 'en': 'long_avg_array'},
-                                        'short_avg_array': {'type': BIT, 'cn': '均线空头排列', 'size': 70,
+                                        'short_avg_array': {'type': TINYINT, 'cn': '均线空头排列', 'size': 70,
                                                             'map': 'SHORT_AVG_ARRAY', 'en': 'short_avg_array'},
-                                        'upper_large_volume': {'type': BIT, 'cn': '高位大成交量', 'size': 70,
+                                        'upper_large_volume': {'type': TINYINT, 'cn': '高位大成交量', 'size': 70,
                                                                'map': 'UPPER_LARGE_VOLUME', 'en': 'upper_large_volume'}
                                         }
                             }    
@@ -1088,7 +1093,7 @@ def get_field_types(cols):
 def get_field_type_name(col_type):
     if col_type == DATE:
         return "datetime"
-    elif col_type == FLOAT or col_type == BIGINT or col_type == INT or col_type == BIT:
+    elif col_type == FLOAT or col_type == BIGINT or col_type == INT or col_type == TINYINT:
         return "numeric"
     else:
         return "string"
@@ -1106,8 +1111,8 @@ def _get_sql_type(py_type):
         return "BIGINT"
     elif isinstance(py_type, INT):
         return "INT"
-    elif isinstance(py_type, BIT):
-        # return "BIT"
+    elif isinstance(py_type, TINYINT):
+        # return "TINYINT"
         return "BOOLEAN"  # 直接映射为 MySQL 的 BOOLEAN 类型
     
     # 处理类类型（如 DATE 类）
@@ -1121,9 +1126,9 @@ def _get_sql_type(py_type):
         return "BIGINT"
     elif py_type == INT:
         return "INT"
-    elif py_type == BIT:
+    elif py_type == TINYINT:
         return "BOOLEAN"  # 直接映射为 MySQL 的 BOOLEAN 类型
-        # return "BIT"
+        # return "TINYINT"
     
     raise ValueError(f"Unsupported type: {py_type}")
 

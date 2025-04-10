@@ -53,7 +53,7 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_stock_info WHERE date = (SELECT MAX(date) FROM cn_stock_info WHERE code = '000001')", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_stock_info WHERE date = (SELECT MAX(date) FROM cn_stock_info WHERE code_int = 1 ) AND market_id IS NOT NULL", conn)
     conn.close()
 
 
@@ -90,17 +90,17 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
             elif data['period'] == 'monthly':
                 monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
-    # 同步表结构并写入数据
-    def sync_and_write(table_name, data):
-        conn = DBManager.get_new_connection()
-        try:
-            同步表结构(conn, table_name, data.columns)
-        finally:
-            if conn.is_connected():
-                conn.close()
-        sql_txt = sql语句生成器(table_name, data)
-        if not execute_raw_sql(sql_txt):
-            raise Exception(f"{table_name} 写入失败")
+    # # 同步表结构并写入数据
+    # def sync_and_write(table_name, data):
+    #     conn = DBManager.get_new_connection()
+    #     try:
+    #         同步表结构(conn, table_name, data.columns)
+    #     finally:
+    #         if conn.is_connected():
+    #             conn.close()
+    #     sql_txt = sql语句生成器(table_name, data)
+    #     if not execute_raw_sql(sql_txt):
+    #         raise Exception(f"{table_name} 写入失败")
 
     sync_and_write(tbs.CN_STOCK_HIST_DAILY_DATA['name'], daily_data)
     sync_and_write(tbs.CN_STOCK_HIST_WEEKLY_DATA['name'], weekly_data)
@@ -127,7 +127,7 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_etf_info WHERE date = (SELECT MAX(date) FROM cn_etf_info WHERE code = '159001')", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_etf_info WHERE date = (SELECT MAX(date) FROM cn_etf_info WHERE  code_int = 159001) AND market_id IS NOT NUL", conn)
     conn.close()
 
     # 准备数据容器
@@ -151,7 +151,7 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
                 )
 
         # 合并数据
-        for future in tqdm(as_completed(futures), total=len(futures), desc="获取股票历史数据"):
+        for future in tqdm(as_completed(futures), total=len(futures), desc="获取基金历史数据"):
             data = future.result()
             if data is None:
                 continue
@@ -163,17 +163,17 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
             elif data['period'] == 'monthly':
                 monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
-    # 同步表结构并写入数据
-    def sync_and_write(table_name, data):
-        conn = DBManager.get_new_connection()
-        try:
-            同步表结构(conn, table_name, data.columns)
-        finally:
-            if conn.is_connected():
-                conn.close()
-        sql_txt = sql语句生成器(table_name, data)
-        if not execute_raw_sql(sql_txt):
-            raise Exception(f"{table_name} 写入失败")
+    # # 同步表结构并写入数据
+    # def sync_and_write(table_name, data):
+    #     conn = DBManager.get_new_connection()
+    #     try:
+    #         同步表结构(conn, table_name, data.columns)
+    #     finally:
+    #         if conn.is_connected():
+    #             conn.close()
+    #     sql_txt = sql语句生成器(table_name, data)
+    #     if not execute_raw_sql(sql_txt):
+    #         raise Exception(f"{table_name} 写入失败")
 
     sync_and_write(tbs.CN_ETF_HIST_DAILY_DATA['name'], daily_data)
     sync_and_write(tbs.CN_ETF_HIST_WEEKLY_DATA['name'], weekly_data)
@@ -200,7 +200,7 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_index_info WHERE date = (SELECT MAX(date) FROM cn_index_info WHERE code = '000001')", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_index_info WHERE date = (SELECT MAX(date) FROM cn_index_info WHERE code_int = 1) AND market_id IS NOT NUL", conn)
     conn.close()
 
     # 准备数据容器
@@ -224,7 +224,7 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
                 )
 
         # 合并数据
-        for future in tqdm(as_completed(futures), total=len(futures), desc="获取股票历史数据"):
+        for future in tqdm(as_completed(futures), total=len(futures), desc="获取指数历史数据"):
             data = future.result()
             if data is None:
                 continue
@@ -236,17 +236,17 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
             elif data['period'] == 'monthly':
                 monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
-    # 同步表结构并写入数据
-    def sync_and_write(table_name, data):
-        conn = DBManager.get_new_connection()
-        try:
-            同步表结构(conn, table_name, data.columns)
-        finally:
-            if conn.is_connected():
-                conn.close()
-        sql_txt = sql语句生成器(table_name, data)
-        if not execute_raw_sql(sql_txt):
-            raise Exception(f"{table_name} 写入失败")
+    # # 同步表结构并写入数据
+    # def sync_and_write(table_name, data):
+    #     conn = DBManager.get_new_connection()
+    #     try:
+    #         同步表结构(conn, table_name, data.columns)
+    #     finally:
+    #         if conn.is_connected():
+    #             conn.close()
+    #     sql_txt = sql语句生成器(table_name, data)
+    #     if not execute_raw_sql(sql_txt):
+    #         raise Exception(f"{table_name} 写入失败")
 
     sync_and_write(tbs.CN_INDEX_HIST_DAILY_DATA['name'], daily_data)
     sync_and_write(tbs.CN_INDEX_HIST_WEEKLY_DATA['name'], weekly_data)
@@ -315,6 +315,7 @@ def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_ty
 
 """
 定义公共函数：
+sync_and_write(table_name: str, data: pd.DataFrame):同步表结构并写入数据
 create_table_if_not_exists(table_name)：检查数据表是否存在，如果不存在，则创建数据库并添加索引
 同步表结构(conn, table_name, data_columns)： 动态检查并自动添加表中缺失的字段
 sql语句生成器(table_name,data)：带入参数数据表名和数据，生成数据插入语句
@@ -322,7 +323,17 @@ execute_raw_sql(sql,params)：执行插入数据表
 convert_date_format(input_date: str)：将 yyyy-mm-dd 格式转换为 yyyymmdd 格式
 """
 
-
+def sync_and_write(table_name: str, data: pd.DataFrame):
+    """通用函数：同步表结构并写入数据"""
+    conn = DBManager.get_new_connection()
+    try:
+        同步表结构(conn, table_name, data.columns)
+    finally:
+        if conn.is_connected():
+            conn.close()
+    sql_txt = sql语句生成器(table_name, data)
+    if not execute_raw_sql(sql_txt):
+        raise Exception(f"{table_name} 写入失败")
 
 class DBManager:
     @staticmethod
@@ -463,66 +474,42 @@ def 同步表结构(conn, table_name, data_columns):
             print("[INFO] 数据库游标已关闭")
 
 
-def sql语句生成器(table_name, data):
-    # # 准备模板
-    # sql_template = """INSERT INTO `{table_name}` ({columns}) VALUES {values} ON DUPLICATE KEY UPDATE {update_clause};"""
-    # # 预处理列名和更新子句
-    # columns = ', '.join([f"`{col}`" for col in data.columns])
-    # update_clause = ', '.join([f"`{col}`=VALUES(`{col}`)" for col in data.columns if col not in ['date', 'code']])
-    # 准备模板
-    # 
-    # 
-    # 预处理数据（如添加code）
-    if 'code' in data.columns and 'code' not in data.columns:
-        data.insert(0, 'code', data['code'].astype(str).str.zfill(6))
-
-    sql_template = """INSERT INTO `{table_name}` ({columns}) 
-        VALUES {values} 
-        ON DUPLICATE KEY UPDATE {update_clause};"""
-
-    # 预处理列名
+def sql语句生成器(table_name, data, batch_size=5000):
+    if 'code' in data.columns:
+        data['code_int'] = data['code'].astype(int)
+    
     columns = ', '.join([f"`{col}`" for col in data.columns])
-
-    # 指定唯一键列（这些字段用于比对数据库中的记录）
-    unique_keys = ['date', 'code'] 
-
-    # 更新子句：更新所有非唯一键的列
-    update_clause = ', '.join(
-        [f"`{col}`=VALUES(`{col}`)"
-         for col in data.columns
-         if col not in unique_keys]
-    )
-    # 批量处理值
-    value_rows = []
-    for row in data.itertuples(index=False):
-        values = []
-        for item in row:
-            if pd.isna(item) or item in ['-', '']:
-                values.append("NULL")
-            elif isinstance(item, (datetime.date, datetime.datetime)):
-                values.append(f"'{item.strftime('%Y-%m-%d')}'")
-            elif isinstance(item, (int, float, bool)):
-                values.append(str(item))
-            else:
-                # 使用三重引号避免嵌套冲突
-                cleaned_item = str(item).replace("'", "''")
-                values.append(f"'{cleaned_item}'")
-        value_rows.append(f"({', '.join(values)})")
-
-    # 批量生成SQL
-    sql_statements = [
-        sql_template.format(
-            table_name=table_name,
-            columns=columns,
-            values=values,
-            update_clause=update_clause
-        )
-        for values in value_rows
-    ]
-
-    # 连接所有语句
-    sql_txt = "\n".join(sql_statements)
-    return sql_txt
+    unique_keys = ['date', 'code']
+    update_clause = ', '.join([f"`{col}`=VALUES(`{col}`)" for col in data.columns if col not in unique_keys])
+    
+    # 分批次处理数据
+    sql_batches = []
+    for i in range(0, len(data), batch_size):
+        batch = data.iloc[i:i+batch_size]
+        value_rows = []
+        for row in batch.itertuples(index=False):
+            values = []
+            for item in row:
+                if pd.isna(item):
+                    values.append("NULL")
+                elif isinstance(item, (datetime.date, datetime.datetime)):
+                    values.append(f"'{item.strftime('%Y-%m-%d')}'")
+                elif isinstance(item, (int, float)):
+                    values.append(str(item))
+                else:
+                    cleaned = str(item).replace("'", "''")
+                    values.append(f"'{cleaned}'")
+            value_rows.append(f"({', '.join(values)})")
+        
+        values_str = ',\n'.join(value_rows)
+        sql = f"""
+            INSERT INTO `{table_name}` ({columns})
+            VALUES {values_str}
+            ON DUPLICATE KEY UPDATE {update_clause};
+        """
+        sql_batches.append(sql)
+    
+    return '\n'.join(sql_batches)
 
 
 def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=5000):

@@ -319,8 +319,8 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
             stock_info_df = temp_df[existing_columns]
 
             # 手动设置固定日期（例如 1212-12-12）做索引使用
-            # fixed_date = "1212-12-12"
-            fixed_date = latest_trade_date
+            fixed_date = "2222-22-22"
+            # fixed_date = latest_trade_date
             stock_info_df = temp_df[existing_columns].copy()  # 显式创建独立副本
             stock_info_df.loc[:, "date"] = fixed_date
             if "market_id" in stock_info_df.columns and "code" in stock_info_df.columns:
@@ -558,8 +558,8 @@ def etf_spot_em() -> pd.DataFrame:
 
 
         # 手动设置固定日期（例如 1212-12-12）做索引使用
-        # fixed_date = "1212-12-12"
-        fixed_date = latest_trade_date
+        fixed_date = "2222-22-22"
+        # fixed_date = latest_trade_date
         etf_info_df = temp_df[existing_columns].copy()  # 显式创建独立副本
         etf_info_df.loc[:, "date"] = fixed_date  # 使用 .loc 进行安全赋值
         if "market_id" in etf_info_df.columns and "code" in etf_info_df.columns:
@@ -791,8 +791,8 @@ def index_zh_a_spot_em() -> pd.DataFrame:
 
 
         # 手动设置固定日期（例如 1212-12-12）做索引使用
-        # fixed_date = "1212-12-12"
-        fixed_date = latest_trade_date
+        fixed_date = "2222-22-22"
+        # fixed_date = latest_trade_date
         index_info_df = temp_df[existing_columns].copy()  # 显式创建独立副本
         index_info_df.loc[:, "date"] = fixed_date  # 使用 .loc 进行安全赋值
         if "market_id" in index_info_df.columns and "code" in index_info_df.columns:
