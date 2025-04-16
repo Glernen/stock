@@ -36,12 +36,16 @@ TABLE_STOCK_INIT = {
     'name': 'cn_stock_info',
     'cn': '股票初始表',
     'columns': {
-        'date': {'type': DATE, 'cn': '更新日期', 'size': 70, 'en': 'date'},
+        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+        'date': {'type': DATE, 'cn': '更新日期', 'size': 90, 'en': 'date'},
+        'date_int': {'type': INT, 'cn': '日期_int', 'size': 8, 'en': 'date_int'},
         'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
         'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
         'market_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'market_id'},
-        'code_market': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '股票标识', 'size': 120, 'en': 'code_market'}
+        'code_market': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '股票标识', 'size': 120, 'en': 'code_market'},
+        'industry': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '所属行业', 'size': 120, 'en': 'industry'}
+        
     }
 }
 
@@ -50,9 +54,11 @@ TABLE_ETF_INIT = {
     'name': 'cn_etf_info',
     'cn': '基金初始表',
     'columns': {
-        'date': {'type': DATE, 'cn': '更新日期', 'size': 70, 'en': 'date'},
+        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+        'date': {'type': DATE, 'cn': '更新日期', 'size': 90, 'en': 'date'},
+        'date_int': {'type': INT, 'cn': '日期_int', 'size': 8, 'en': 'date_int'},
         'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
         'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
         'market_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'market_id'},
         'code_market': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '股票标识', 'size': 120, 'en': 'code_market'}
@@ -64,9 +70,11 @@ TABLE_INDEX_INIT = {
     'name': 'cn_index_info',
     'cn': '指数初始表',
     'columns': {
-        'date': {'type': DATE, 'cn': '更新日期', 'size': 70, 'en': 'date'},
+        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+        'date': {'type': DATE, 'cn': '更新日期', 'size': 90, 'en': 'date'},
+        'date_int': {'type': INT, 'cn': '日期_int', 'size': 8, 'en': 'date_int'},
         'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
         'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
         'market_id': {'type': INT, 'cn': '市场标识', 'size': 10, 'en': 'market_id'},
         'code_market': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '股票标识', 'size': 120, 'en': 'code_market'}
@@ -75,17 +83,20 @@ TABLE_INDEX_INIT = {
 
 
 TABLE_CN_STOCK_ATTENTION = {'name': 'cn_stock_attention', 'cn': '我的关注',
-                            'columns': {'datetime': {'type': DATETIME, 'cn': '日期', 'size': 0, 'en': 'datetime'},
+                            'columns': {'datetime': {'type': DATETIME, 'cn': '日期', 'size': 90, 'en': 'datetime'},
                             'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'}}}
 
 TABLE_CN_ETF_SPOT = {
     'name': 'cn_etf_spot',
     'cn': '每日ETF数据',
     'columns': {
-        'date': {'map': None, 'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'},
-        'code': {'map': 'f12',  'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60, 'en': 'code'},
+        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+        'date': {'map': None, 'type': DATE, 'cn': '日期', 'size': 90, 'en': 'date'},
+        'date_int': {'map': None, 'type': INT, 'cn': '日期_int', 'size': 8, 'en': 'date_int'},
+        'code': {'map': 'f12',  'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
         'name': {'map': 'f14', 'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'market_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 10,  'en': 'market_id'},
+        'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
+        'market_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 70,  'en': 'market_id'},
         'new_price': {'map': 'f2', 'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
         'change_rate': {'map': 'f3',  'type': FLOAT, 'cn': '涨跌幅', 'size': 70, 'en': 'change_rate'},
         'ups_downs': {'map': 'f4',  'type': FLOAT, 'cn': '涨跌额', 'size': 70, 'en': 'ups_downs'},
@@ -105,10 +116,13 @@ TABLE_CN_INDEX_SPOT = {
     'name': 'cn_index_spot',
     'cn': '每日指数数据',
     'columns': {
-        'date': {'map': None, 'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'},
-        'code': {'map': 'f12',  'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 60, 'en': 'code'},
+        #'id' : {'map': None,'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+        'date': {'map': None, 'type': DATE, 'cn': '日期', 'size': 90, 'en': 'date'},
+        'date_int': {'map': None,'type': INT, 'cn': '日期_int', 'size': 8, 'en': 'date_int'},
+        'code': {'map': 'f12',  'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
+        'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'en': 'code_int'},
         'name': {'map': 'f14', 'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
-        'market_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 10,  'en': 'market_id'},
+        'market_id':{'map': 'f13', 'type': INT, 'cn': '市场标识', 'size': 70,  'en': 'market_id'},
         'new_price': {'map': 'f2', 'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
         'change_rate': {'map': 'f3',  'type': FLOAT, 'cn': '涨跌幅', 'size': 70, 'en': 'change_rate'},
         'ups_downs': {'map': 'f4',  'type': FLOAT, 'cn': '涨跌额', 'size': 70, 'en': 'ups_downs'},
@@ -128,8 +142,11 @@ TABLE_CN_STOCK_SPOT = {
     'name': 'cn_stock_spot',
     'cn': '每日股票数据',
     'columns': {
-        # 'date': {'type': DATE, 'cn': '日期', 'size': 0, 'map': None, 'en': 'date'},
-        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'map': 'f12', 'en': 'code'},
+        #'id' : {'map': None,'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+        'date': {'type': DATE, 'cn': '日期', 'size': 90, 'map': None, 'en': 'date'},
+        'date_int': {'type': INT, 'cn': '日期_int', 'size': 8, 'map': None,'en': 'date_int'},
+        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'map': 'f12', 'en': 'code'},
+        'code_int': {'type': INT, 'cn': '代码_int', 'size': 10, 'map': None, 'en': 'code_int'},
         'name': {'type': VARCHAR(20, _COLLATE), 'cn': '代码', 'size': 70, 'map': 'f14', 'en': 'name'},
         'market_id':{'type': INT, 'cn': '市场标识', 'size': 10, 'map': 'f13', 'en': 'market_id'},
         'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'map': 'f2', 'en': 'new_price'},
@@ -179,7 +196,7 @@ TABLE_CN_STOCK_SPOT_BUY = {'name': 'cn_stock_spot_buy', 'cn': '基本面选股',
                            'columns': TABLE_CN_STOCK_SPOT['columns'].copy()}
 
 CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日',
-                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate': {'type': FLOAT, 'cn': '今日涨跌幅', 'size': 70, 'en': 'change_rate'},
@@ -194,7 +211,7 @@ CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日'
                                    'fund_amount_small': {'type': BIGINT, 'cn': '今日小单净流入-净额', 'size': 100, 'en': 'fund_amount_small'},
                                    'fund_rate_small': {'type': FLOAT, 'cn': '今日小单净流入-净占比', 'size': 70, 'en': 'fund_rate_small'}}},
                       {'name': 'stock_individual_fund_flow_rank', 'cn': '3日',
-                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate_3': {'type': FLOAT, 'cn': '3日涨跌幅', 'size': 70, 'en': 'change_rate_3'},
@@ -209,7 +226,7 @@ CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日'
                                    'fund_amount_small_3': {'type': BIGINT, 'cn': '3日小单净流入-净额', 'size': 100, 'en': 'fund_amount_small_3'},
                                    'fund_rate_small_3': {'type': FLOAT, 'cn': '3日小单净流入-净占比', 'size': 70, 'en': 'fund_rate_small_3'}}},
                       {'name': 'stock_individual_fund_flow_rank', 'cn': '5日',
-                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate_5': {'type': FLOAT, 'cn': '5日涨跌幅', 'size': 70, 'en': 'change_rate_5'},
@@ -224,7 +241,7 @@ CN_STOCK_FUND_FLOW = ({'name': 'stock_individual_fund_flow_rank', 'cn': '今日'
                                    'fund_amount_small_5': {'type': BIGINT, 'cn': '5日小单净流入-净额', 'size': 100, 'en': 'fund_amount_small_5'},
                                    'fund_rate_small_5': {'type': FLOAT, 'cn': '5日小单净流入-净占比', 'size': 70, 'en': 'fund_rate_small_5'}}},
                       {'name': 'stock_individual_fund_flow_rank', 'cn': '10日',
-                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+                       'columns': {'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
                                    'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                    'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'en': 'new_price'},
                                    'change_rate_10': {'type': FLOAT, 'cn': '10日涨跌幅', 'size': 70, 'en': 'change_rate_10'},
@@ -289,18 +306,18 @@ CN_STOCK_SECTOR_FUND_FLOW = (('行业资金流', '概念资金流'),
                                           'stock_name_10': {'type': VARCHAR(20, _COLLATE), 'cn': '10日主力净流入最大股', 'size': 70, 'en': 'stock_name_10'}}}))
 
 TABLE_CN_STOCK_FUND_FLOW_INDUSTRY = {'name': 'cn_stock_fund_flow_industry', 'cn': '行业资金流向',
-                                     'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'}}}
+                                     'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 90, 'en': 'date'}}}
 for cf in CN_STOCK_SECTOR_FUND_FLOW[1]:
     TABLE_CN_STOCK_FUND_FLOW_INDUSTRY['columns'].update(cf['columns'].copy())
 
 TABLE_CN_STOCK_FUND_FLOW_CONCEPT = {'name': 'cn_stock_fund_flow_concept', 'cn': '概念资金流向',
-                                    'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'}}}
+                                    'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 90, 'en': 'date'}}}
 for cf in CN_STOCK_SECTOR_FUND_FLOW[1]:
     TABLE_CN_STOCK_FUND_FLOW_CONCEPT['columns'].update(cf['columns'].copy())
 
 TABLE_CN_STOCK_BONUS = {'name': 'cn_stock_bonus', 'cn': '股票分红配送',
-                        'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0, 'en': 'date'},
-                                    'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'en': 'code'},
+                        'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 90, 'en': 'date'},
+                                    'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
                                     'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70, 'en': 'name'},
                                     'convertible_total_rate': {'type': FLOAT, 'cn': '送转股份-送转总比例', 'size': 70, 'en': 'convertible_total_rate'},
                                     'convertible_rate': {'type': FLOAT, 'cn': '送转股份-送转比例', 'size': 70, 'en': 'convertible_rate'},
@@ -346,10 +363,12 @@ TABLE_CN_STOCK_BLOCKTRADE = {'name': 'cn_stock_blocktrade', 'cn': '股票大宗�
 
 # 基础字段结构（新增'en'字段）
 BASE_COLUMNS = {
-                'date':    {'type': DATE,  'cn': '日期', 'en': 'date', 'map': 0, 'size': 70}, 
+                # 'id' : {'type': INT, 'cn': 'id', 'size': 0,'map': None, 'en': 'id'},
+                'date':    {'type': DATE,  'cn': '日期', 'en': 'date', 'map': 0, 'size': 90}, 
+                'date_int':    {'type': INT,  'cn': '日期_int', 'en': 'date_int', 'map': None, 'size': 90}, 
                 'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
                 'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
-                'code_int': {'type': INT, 'cn': '代码', 'size': 70, 'en': 'code_int'},
+                'code_int': {'type': INT, 'cn': '代码', 'size': 70,'map': None, 'en': 'code_int'},
                 'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  # 对应 open_price 的 map: f17
                 'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},   # 对应 new_price 的 map: f2
                 'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70},  # 对应 high_price 的 map: f15
@@ -425,7 +444,7 @@ TABLE_CN_INDEX_BACKTEST_DATA = {'name': 'cn_index_backtest_data', 'cn': '指数�
                                             range(1, RATE_FIELDS_COUNT + 1, 1)}}
 
 STOCK_STATS_DATA = {'name': 'calculate_indicator', 'cn': '股票统计/指标计算助手库',
-                    'columns': {'close': {'type': FLOAT, 'cn': '价格', 'size': 0},
+                    'columns': {'close': {'type': FLOAT, 'cn': '收盘价', 'size': 70},
                                 'macd': {'type': FLOAT, 'cn': 'dif', 'size': 70},
                                 'macds': {'type': FLOAT, 'cn': 'macd', 'size': 70},
                                 'macdh': {'type': FLOAT, 'cn': 'histogram', 'size': 70},
@@ -501,9 +520,13 @@ STOCK_STATS_DATA = {'name': 'calculate_indicator', 'cn': '股票统计/指标计
                                 'stochrsi_d': {'type': FLOAT, 'cn': 'stochrsi_d', 'size': 70}}}
 
 TABLE_CN_STOCK_FOREIGN_KEY = {'name': 'cn_stock_foreign_key', 'cn': '股票外键',
-                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
+                              'columns': {
+                                        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+                                        'date': {'type': DATE, 'cn': '日期', 'size': 90},
+                                        'date_int': {'type': INT, 'cn': '日期_int', 'size': 90},
+                                        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70},
+                                        'code_int': {'type': INT, 'cn': '代码_int', 'size': 70},
+                                        'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
 
 TABLE_CN_STOCK_INDICATORS = {'name': 'cn_stock_indicators', 'cn': '股票指标数据',
                              'columns': TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()}
@@ -512,8 +535,20 @@ TABLE_CN_STOCK_INDICATORS['columns'].update(STOCK_STATS_DATA['columns'])
 _tmp_columns = TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()
 _tmp_columns.update(TABLE_CN_STOCK_BACKTEST_DATA['columns'])
 
+TABLE_CN_STOCK_INDICATORS_BUY1 = {'name': 'cn_stock_indicators_buy', 'cn': '股票指标买入',
+                                 'columns': {
+                                        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+                                        'date': {'type': DATE, 'cn': '日期', 'size': 90},
+                                        'date_int': {'type': INT, 'cn': '日期_int', 'size': 90},
+                                        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70},
+                                        'code_int': {'type': INT, 'cn': '代码_int', 'size': 70},
+                                        'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
+                                        'close': {'type': FLOAT, 'cn': '价格', 'size': 70},
+                                        'turnover': {'type': FLOAT, 'cn': '换手率', 'size': 70},
+                                        'industry': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '所属行业', 'size': 120, 'en': 'industry'}}}
+buy_columns = TABLE_CN_STOCK_INDICATORS_BUY1['columns'].update(TABLE_CN_STOCK_BACKTEST_DATA['columns'])
 TABLE_CN_STOCK_INDICATORS_BUY = {'name': 'cn_stock_indicators_buy', 'cn': '股票指标买入',
-                                 'columns': _tmp_columns}
+                                 'columns': {buy_columns}
 
 TABLE_CN_STOCK_INDICATORS_SELL = {'name': 'cn_stock_indicators_sell', 'cn': '股票指标卖出',
                                   'columns': _tmp_columns}
@@ -521,9 +556,15 @@ TABLE_CN_STOCK_INDICATORS_SELL = {'name': 'cn_stock_indicators_sell', 'cn': '股
 # ETF数据表
 
 TABLE_CN_ETF_FOREIGN_KEY = {'name': 'cn_etf_foreign_key', 'cn': '基金外键',
-                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}} 
+                              'columns': {
+                                        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+                                        'date': {'type': DATE, 'cn': '日期', 'size': 90},
+                                        'date_int': {'type': INT, 'cn': '日期_int', 'size': 90},
+                                        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70},
+                                        'code_int': {'type': INT, 'cn': '代码_int', 'size': 70},
+                                        'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70},
+                                        'close': {'type': FLOAT, 'cn': '价格', 'size': 70},
+                                        'turnover': {'type': FLOAT, 'cn': '换手率', 'size': 70}}}
 
 TABLE_CN_ETF_INDICATORS = {'name': 'cn_etf_indicators', 'cn': 'ETF指标数据',
                              'columns': TABLE_CN_ETF_FOREIGN_KEY['columns'].copy()}
@@ -541,9 +582,14 @@ TABLE_CN_ETF_INDICATORS_SELL = {'name': 'cn_etf_indicators_sell', 'cn': 'ETF指�
 # 指数数据表
  
 TABLE_CN_INDEX_FOREIGN_KEY = {'name': 'cn_index_foreign_key', 'cn': '指数外键',
-                              'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0},
-                                          'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10},
-                                          'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}} 
+                              'columns': {
+                                        # 'id' : {'type': INT, 'cn': 'id', 'size': 0, 'en': 'id'},
+                                        'date': {'type': DATE, 'cn': '日期', 'size': 90},
+                                        'date_int': {'type': INT, 'cn': '日期_int', 'size': 90},
+                                        'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70},
+                                        'code_int': {'type': INT, 'cn': '代码_int', 'size': 70},
+                                        'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70}}}
+
 INDEX_STATS_DATA = {'name': 'calculate_index_indicator', 'cn': '指标计算助手库',
                     'columns': {'close': {'type': FLOAT, 'cn': '价格', 'size': 0},
                                 'macd': {'type': FLOAT, 'cn': 'dif', 'size': 70},
@@ -733,7 +779,9 @@ TABLE_CN_STOCK_KLINE_PATTERN['columns'].update(STOCK_KLINE_PATTERN_DATA['columns
 
 TABLE_CN_STOCK_SELECTION = {'name': 'cn_stock_selection', 'cn': '综合选股',
                             'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0, 'map': 'MAX_TRADE_DATE', 'en': 'date'},
+                                        'date_int': {'type': INT, 'cn': '日期_int', 'size': 8, 'map':None, 'en': 'date_int'},
                                         'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 10, 'map': 'SECURITY_CODE', 'en': 'code'},
+                                        'code_int': {'type': INT, 'cn': '代码_int', 'size': 10,'map':None, 'en': 'code_int'},
                                         'name': {'type': VARCHAR(20, _COLLATE), 'cn': '名称', 'size': 70,'map': 'SECURITY_NAME_ABBR', 'en': 'name'},
                                         'secucode': {'type': VARCHAR(20, _COLLATE), 'cn': '证券代码', 'size': 70,'map': 'SECUCODE', 'en': 'secucode'},
                                         'new_price': {'type': FLOAT, 'cn': '最新价', 'size': 70, 'map': 'NEW_PRICE', 'en': 'new_price'},

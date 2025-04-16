@@ -30,6 +30,9 @@ import selection_data_daily_job as sddj
 import basic_data as basic_data
 import basic_hist_data as basic_hist_data
 import indicators_data_daily as indicators_data_daily
+import threeday_indicators  as threeday_indicators
+import indicators_buy as indicators_buy
+
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -51,6 +54,12 @@ def main():
 
     # 通过数据基础表，获取历史数据表中个股数据，计算所有股票、基金、指数的日行情指标，并同时创建和写入日行情指标主表
     indicators_data_daily.main()
+
+    # 指标数据处理
+    threeday_indicators.main()
+    
+    # 买入策略
+    indicators_buy.main()
 
     # 第2.1步创建股票基础数据表
     # hdj.main()

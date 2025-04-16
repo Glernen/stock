@@ -28,7 +28,11 @@ from tqdm import tqdm
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 
 
-
+def is_a_stock(code):
+    """判断是否属于需要采集的A股"""
+    # 处理带市场前缀的情况（如sh600000）
+    pure_code = code[-6:] if len(code) > 6 else code
+    return pure_code.startswith(('600','601','603','605','000','001','002','003','300','301'))
 
 # numeric_cols = ["f2", "f3", "f4", "f5", "f6", "f7", "f8", "f10", "f15", "f16", "f17", "f18", "f22", "f11", "f24", "f25", "f9", "f115", "f114", "f23", "f112", "f113", "f61", "f48", "f37", "f49", "f57", "f40", "f41", "f45", "f46", "f38", "f39", "f20", "f21" ]
 # date_cols = ["f26", "f221"]
@@ -46,8 +50,8 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
     # 创建表
     for table_config in [
         tbs.CN_STOCK_HIST_DAILY_DATA,
-        tbs.CN_STOCK_HIST_WEEKLY_DATA,
-        tbs.CN_STOCK_HIST_MONTHLY_DATA
+        # tbs.CN_STOCK_HIST_WEEKLY_DATA,
+        # tbs.CN_STOCK_HIST_MONTHLY_DATA
     ]:
         create_table_if_not_exists(table_config['name'])
 
@@ -56,11 +60,14 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
     stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_stock_info WHERE date = (SELECT MAX(date) FROM cn_stock_info WHERE code_int = 1 ) AND market_id IS NOT NULL", conn)
     conn.close()
 
+    # 新增过滤逻辑：只保留目标股票
+    stock_df = stock_df[stock_df['code'].apply(is_a_stock)]  # <-- 关键修改位置
+    print(f"待采集股票数量：{len(stock_df)}")
 
     # 准备数据容器
     daily_data = pd.DataFrame()
-    weekly_data = pd.DataFrame()
-    monthly_data = pd.DataFrame()
+    # weekly_data = pd.DataFrame()
+    # monthly_data = pd.DataFrame()
 
     # 多线程获取数据
     with ThreadPoolExecutor(max_workers=20) as executor:
@@ -69,7 +76,8 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
             code = row['code']
             market_id = row['market_id']
             name = row['name']
-            for period in ["daily", "weekly", "monthly"]:
+            # for period in ["daily", "weekly", "monthly"]:
+            for period in ["daily"]:
                 futures.append(
                     executor.submit(
                         fetch_single_hist,
@@ -85,28 +93,18 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
             df = data['df']
             if data['period'] == 'daily':
                 daily_data = pd.concat([daily_data, df], ignore_index=True)
-            elif data['period'] == 'weekly':
-                weekly_data = pd.concat([weekly_data, df], ignore_index=True)
-            elif data['period'] == 'monthly':
-                monthly_data = pd.concat([monthly_data, df], ignore_index=True)
+            # elif data['period'] == 'weekly':
+            #     weekly_data = pd.concat([weekly_data, df], ignore_index=True)
+            # elif data['period'] == 'monthly':
+            #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
-    # # 同步表结构并写入数据
-    # def sync_and_write(table_name, data):
-    #     conn = DBManager.get_new_connection()
-    #     try:
-    #         同步表结构(conn, table_name, data.columns)
-    #     finally:
-    #         if conn.is_connected():
-    #             conn.close()
-    #     sql_txt = sql语句生成器(table_name, data)
-    #     if not execute_raw_sql(sql_txt):
-    #         raise Exception(f"{table_name} 写入失败")
 
     sync_and_write(tbs.CN_STOCK_HIST_DAILY_DATA['name'], daily_data)
-    sync_and_write(tbs.CN_STOCK_HIST_WEEKLY_DATA['name'], weekly_data)
-    sync_and_write(tbs.CN_STOCK_HIST_MONTHLY_DATA['name'], monthly_data)
+    # sync_and_write(tbs.CN_STOCK_HIST_WEEKLY_DATA['name'], weekly_data)
+    # sync_and_write(tbs.CN_STOCK_HIST_MONTHLY_DATA['name'], monthly_data)
     
-    print(f"[Success] 股票历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
+    # print(f"[Success] 股票历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
+    print(f"[Success] 股票历史数据写入完成（日：{len(daily_data)}）")
 
 ########################################
 #获取ETF基金历史数据并写入数据库
@@ -120,20 +118,20 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
     # 创建表
     for table_config in [
         tbs.CN_ETF_HIST_DAILY_DATA,
-        tbs.CN_ETF_HIST_WEEKLY_DATA,
-        tbs.CN_ETF_HIST_MONTHLY_DATA
+        # tbs.CN_ETF_HIST_WEEKLY_DATA,
+        # tbs.CN_ETF_HIST_MONTHLY_DATA
     ]:
         create_table_if_not_exists(table_config['name'])
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_etf_info WHERE date = (SELECT MAX(date) FROM cn_etf_info WHERE  code_int = 159001) AND market_id IS NOT NUL", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_etf_info WHERE date = (SELECT MAX(date) FROM cn_etf_info WHERE  code_int = 159001) AND market_id IS NOT NULL", conn)
     conn.close()
 
     # 准备数据容器
     daily_data = pd.DataFrame()
-    weekly_data = pd.DataFrame()
-    monthly_data = pd.DataFrame()
+    # weekly_data = pd.DataFrame()
+    # monthly_data = pd.DataFrame()
 
     # 多线程获取数据
     with ThreadPoolExecutor() as executor:
@@ -142,11 +140,12 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
             code = row['code']
             market_id = row['market_id']
             name = row['name']
-            for period in ["daily", "weekly", "monthly"]:
+            # for period in ["daily", "weekly", "monthly"]:
+            for period in ["daily"]:
                 futures.append(
                     executor.submit(
                         fetch_single_hist,
-                        code, market_id, period, name, "stock", beg, end
+                        code, market_id, period, name, "etf", beg, end
                     )
                 )
 
@@ -158,28 +157,18 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
             df = data['df']
             if data['period'] == 'daily':
                 daily_data = pd.concat([daily_data, df], ignore_index=True)
-            elif data['period'] == 'weekly':
-                weekly_data = pd.concat([weekly_data, df], ignore_index=True)
-            elif data['period'] == 'monthly':
-                monthly_data = pd.concat([monthly_data, df], ignore_index=True)
+            # elif data['period'] == 'weekly':
+            #     weekly_data = pd.concat([weekly_data, df], ignore_index=True)
+            # elif data['period'] == 'monthly':
+            #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
-    # # 同步表结构并写入数据
-    # def sync_and_write(table_name, data):
-    #     conn = DBManager.get_new_connection()
-    #     try:
-    #         同步表结构(conn, table_name, data.columns)
-    #     finally:
-    #         if conn.is_connected():
-    #             conn.close()
-    #     sql_txt = sql语句生成器(table_name, data)
-    #     if not execute_raw_sql(sql_txt):
-    #         raise Exception(f"{table_name} 写入失败")
 
     sync_and_write(tbs.CN_ETF_HIST_DAILY_DATA['name'], daily_data)
-    sync_and_write(tbs.CN_ETF_HIST_WEEKLY_DATA['name'], weekly_data)
-    sync_and_write(tbs.CN_ETF_HIST_MONTHLY_DATA['name'], monthly_data)
+    # sync_and_write(tbs.CN_ETF_HIST_WEEKLY_DATA['name'], weekly_data)
+    # sync_and_write(tbs.CN_ETF_HIST_MONTHLY_DATA['name'], monthly_data)
     
-    print(f"[Success] 基金历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
+    # print(f"[Success] 基金历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
+    print(f"[Success] 基金历史数据写入完成（日：{len(daily_data)}）")
 
 ########################################
 #获取指数历史数据并写入数据库
@@ -193,20 +182,20 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
     # 创建表
     for table_config in [
         tbs.CN_INDEX_HIST_DAILY_DATA,
-        tbs.CN_INDEX_HIST_WEEKLY_DATA,
-        tbs.CN_INDEX_HIST_MONTHLY_DATA
+        # tbs.CN_INDEX_HIST_WEEKLY_DATA,
+        # tbs.CN_INDEX_HIST_MONTHLY_DATA
     ]:
         create_table_if_not_exists(table_config['name'])
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_index_info WHERE date = (SELECT MAX(date) FROM cn_index_info WHERE code_int = 1) AND market_id IS NOT NUL", conn)
+    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_index_info WHERE date = (SELECT MAX(date) FROM cn_index_info WHERE code_int = 1) AND market_id IS NOT NULL", conn)
     conn.close()
 
     # 准备数据容器
     daily_data = pd.DataFrame()
-    weekly_data = pd.DataFrame()
-    monthly_data = pd.DataFrame()
+    # weekly_data = pd.DataFrame()
+    # monthly_data = pd.DataFrame()
 
     # 多线程获取数据
     with ThreadPoolExecutor() as executor:
@@ -215,11 +204,12 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
             code = row['code']
             market_id = row['market_id']
             name = row['name']
-            for period in ["daily", "weekly", "monthly"]:
+            # for period in ["daily", "weekly", "monthly"]:
+            for period in ["daily"]:
                 futures.append(
                     executor.submit(
                         fetch_single_hist,
-                        code, market_id, period, name, "stock", beg, end
+                        code, market_id, period, name, "index", beg, end
                     )
                 )
 
@@ -231,29 +221,18 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
             df = data['df']
             if data['period'] == 'daily':
                 daily_data = pd.concat([daily_data, df], ignore_index=True)
-            elif data['period'] == 'weekly':
-                weekly_data = pd.concat([weekly_data, df], ignore_index=True)
-            elif data['period'] == 'monthly':
-                monthly_data = pd.concat([monthly_data, df], ignore_index=True)
+            # elif data['period'] == 'weekly':
+            #     weekly_data = pd.concat([weekly_data, df], ignore_index=True)
+            # elif data['period'] == 'monthly':
+            #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
-    # # 同步表结构并写入数据
-    # def sync_and_write(table_name, data):
-    #     conn = DBManager.get_new_connection()
-    #     try:
-    #         同步表结构(conn, table_name, data.columns)
-    #     finally:
-    #         if conn.is_connected():
-    #             conn.close()
-    #     sql_txt = sql语句生成器(table_name, data)
-    #     if not execute_raw_sql(sql_txt):
-    #         raise Exception(f"{table_name} 写入失败")
 
     sync_and_write(tbs.CN_INDEX_HIST_DAILY_DATA['name'], daily_data)
-    sync_and_write(tbs.CN_INDEX_HIST_WEEKLY_DATA['name'], weekly_data)
-    sync_and_write(tbs.CN_INDEX_HIST_MONTHLY_DATA['name'], monthly_data)
+    # sync_and_write(tbs.CN_INDEX_HIST_WEEKLY_DATA['name'], weekly_data)
+    # sync_and_write(tbs.CN_INDEX_HIST_MONTHLY_DATA['name'], monthly_data)
     
-    print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
-
+    # print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
+    print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}）")
 
 def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_type: str, beg: str, end: str):
     """通用函数：获取单个代码的历史数据（股票/ETF/指数）"""
@@ -302,6 +281,7 @@ def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_ty
         df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
         df.rename(columns=en_name, inplace=True)
         df['date'] = pd.to_datetime(df['date'])
+        df['date_int'] = df['date'].astype(str).str.replace('-', '')
         df['code'] = code
         df['code_int'] = code
         df['period'] = period
@@ -323,17 +303,68 @@ execute_raw_sql(sql,params)：执行插入数据表
 convert_date_format(input_date: str)：将 yyyy-mm-dd 格式转换为 yyyymmdd 格式
 """
 
+# def sync_and_write(table_name: str, data: pd.DataFrame):
+#     """通用函数：同步表结构并写入数据"""
+#     conn = DBManager.get_new_connection()
+#     try:
+#         同步表结构(conn, table_name, data.columns)
+#     finally:
+#         if conn.is_connected():
+#             conn.close()
+#     sql_txt = sql语句生成器(table_name, data)
+#     if not execute_raw_sql(sql_txt):
+#         raise Exception(f"{table_name} 写入失败")
+
 def sync_and_write(table_name: str, data: pd.DataFrame):
-    """通用函数：同步表结构并写入数据"""
-    conn = DBManager.get_new_connection()
+    """同步表结构并写入数据（新增索引优化）"""
+    if data.empty:
+        print(f"[Warning] 表 {table_name} 无数据可写入")
+        return
+
+    conn = None
     try:
+        conn = DBManager.get_new_connection()
+        cursor = conn.cursor()
+
+        # ============== 新增代码开始 ==============
+        # 1. 禁用索引（独立事务提交）
+        disable_sql = f"ALTER TABLE `{table_name}` DISABLE KEYS;"
+        cursor.execute(disable_sql)
+        conn.commit()
+        print(f"[Optimize] 已禁用 {table_name} 表索引")
+        # ============== 新增代码结束 ==============
+
+        # 原有逻辑：同步表结构
         同步表结构(conn, table_name, data.columns)
+
+        # 原有逻辑：生成SQL
+        sql_txt = sql语句生成器(table_name, data)
+
+        # ============== 修改位置 ==============
+        # 替换原有的 execute_raw_sql 调用
+        # 原代码：if not execute_raw_sql(sql_txt)
+        if not execute_raw_sql(sql_txt, conn):  # 传入连接对象
+            raise Exception(f"{table_name} 写入失败")
+
+        # ============== 新增代码开始 ==============
+        # 2. 启用索引（独立事务提交）
+        enable_sql = f"ALTER TABLE `{table_name}` ENABLE KEYS;"
+        cursor.execute(enable_sql)
+        conn.commit()
+        print(f"[Optimize] 已重建 {table_name} 表索引")
+        # ============== 新增代码结束 ==============
+
+    except Exception as e:
+        print(f"[Critical] 数据写入异常: {str(e)}")
+        # 异常时强制启用索引
+        if conn and conn.is_connected():
+            cursor.execute(f"ALTER TABLE `{table_name}` ENABLE KEYS;")
+            conn.commit()
+        raise
     finally:
-        if conn.is_connected():
+        if conn and conn.is_connected():
+            cursor.close()
             conn.close()
-    sql_txt = sql语句生成器(table_name, data)
-    if not execute_raw_sql(sql_txt):
-        raise Exception(f"{table_name} 写入失败")
 
 class DBManager:
     @staticmethod
@@ -373,14 +404,48 @@ def create_table_if_not_exists(table_name):
     # 创建表（不含索引）
     create_table_sql = f"""
         CREATE TABLE IF NOT EXISTS `{table_name}` (
+            `id` INT AUTO_INCREMENT PRIMARY KEY,
             `date` DATE,
-            `code` VARCHAR(6),
+            `date_int` INT,
             `code_int` INT,
+            `code` VARCHAR(6),
             `name` VARCHAR(20)
         );
     """
     DBManager.execute_sql(create_table_sql)
-    
+
+    # 检查并添加id列（如果不存在）
+    conn = DBManager.get_new_connection()
+    if conn:
+        try:
+            cursor = conn.cursor()
+            # 检查id列是否存在
+            check_sql = f"""
+                SELECT COUNT(*)
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_SCHEMA = DATABASE()
+                  AND TABLE_NAME = '{table_name}'
+                  AND COLUMN_NAME = 'id';
+            """
+            cursor.execute(check_sql)
+            count = cursor.fetchone()[0]
+            if count == 0:
+                # 添加id列
+                alter_sql = f"""
+                    ALTER TABLE `{table_name}`
+                    ADD COLUMN `id` INT AUTO_INCREMENT PRIMARY KEY FIRST;
+                """
+                cursor.execute(alter_sql)
+                conn.commit()
+                print(f"表 {table_name} 成功添加 id 列")
+        except Error as e:
+            print(f"检查或添加 id 列失败: {e}")
+            conn.rollback()
+        finally:
+            if conn.is_connected():
+                cursor.close()
+                conn.close()
+
     # 创建索引（修复 Unread result found 问题）
     def create_index(index_name, columns, is_unique=False):
         conn = DBManager.get_new_connection()
@@ -412,9 +477,10 @@ def create_table_if_not_exists(table_name):
                 conn.close()
 
     # 添加索引
-    create_index("idx_date_code", ["date", "code"], is_unique=True)
+    create_index("idx_date_code_int", ["date_int", "code_int"], is_unique=True)
     create_index("idx_code_int", ["code_int"])
-    create_index("idx_date", ["date"])
+    create_index("idx_date_int", ["date_int"])
+
 
 
 def 同步表结构(conn, table_name, data_columns):
@@ -512,35 +578,70 @@ def sql语句生成器(table_name, data, batch_size=5000):
     return '\n'.join(sql_batches)
 
 
-def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=5000):
-    """改进后的SQL执行函数，解决Commands out of sync问题"""
-    connection = DBManager.get_new_connection()
-    if not connection:
+def execute_raw_sql(sql, conn=None):
+    """执行原始SQL（新增连接复用）"""
+    # ============== 修改开始 ==============
+    # 允许外部传入连接
+    if not conn:
+        conn = DBManager.get_new_connection()
+    if not conn:
         return False
+    # ============== 修改结束 ==============
+    
     try:
-        cursor = connection.cursor(buffered=True)  # 使用缓冲游标
+        cursor = conn.cursor(buffered=True)
         statements = [s.strip() for s in sql.split(';') if s.strip()]
         
-        for i in range(0, len(statements), batch_size):
-            batch = statements[i:i+batch_size]
-            for statement in batch:
-                try:
-                    cursor.execute(statement)
-                    cursor.fetchall()  # 显式消费结果集
-                except Error as e:
-                    print(f"执行失败: {statement[:50]}... | 错误: {e}")
-                    connection.rollback()
-                    return False
-            connection.commit()  # 每批提交一次
+        for statement in statements:
+            try:
+                cursor.execute(statement)
+                if cursor.with_rows:
+                    cursor.fetchall()  # 消费结果集
+            except Exception as e:
+                print(f"执行失败: {statement[:100]}... | 错误: {e}")
+                return False
         return True
     except Error as e:
         print(f"数据库错误: {e}")
-        connection.rollback()
         return False
     finally:
-        if connection.is_connected():
-            cursor.close()
-            connection.close()
+        # ============== 修改开始 ==============
+        # 仅关闭外部创建的连接
+        if not conn:  # 只有当conn是本地创建时才关闭
+            if conn.is_connected():
+                cursor.close()
+                conn.close()
+        # ============== 修改结束 ==============
+
+# def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=5000):
+#     """改进后的SQL执行函数，解决Commands out of sync问题"""
+#     connection = DBManager.get_new_connection()
+#     if not connection:
+#         return False
+#     try:
+#         cursor = connection.cursor(buffered=True)  # 使用缓冲游标
+#         statements = [s.strip() for s in sql.split(';') if s.strip()]
+        
+#         for i in range(0, len(statements), batch_size):
+#             batch = statements[i:i+batch_size]
+#             for statement in batch:
+#                 try:
+#                     cursor.execute(statement)
+#                     cursor.fetchall()  # 显式消费结果集
+#                 except Error as e:
+#                     print(f"执行失败: {statement[:50]}... | 错误: {e}")
+#                     connection.rollback()
+#                     return False
+#             connection.commit()  # 每批提交一次
+#         return True
+#     except Error as e:
+#         print(f"数据库错误: {e}")
+#         connection.rollback()
+#         return False
+#     finally:
+#         if connection.is_connected():
+#             cursor.close()
+#             connection.close()
 
 
 def convert_date_format(input_date: str) -> str:
