@@ -39,67 +39,7 @@ def main():
         with cnx.cursor() as cursor:
             # 先获取指数买入推荐占比
             ratio_query = """
-            -- 子查询获取最大日期
-            WITH max_date AS (
-                SELECT MAX(date_int) AS max_date_int FROM index_3day_indicators
-            ),
-            up_sentiment AS (
-                SELECT
-                    md.max_date_int AS date_int,
-                    ROUND(IFNULL((COUNT(i3di.date_int) / 10.0) * 100, 0)) AS `指数上涨情绪`
-                FROM
-                    max_date md
-                -- 左连接确保即使无符合条件数据也能显示最大日期
-                LEFT JOIN index_3day_indicators i3di ON 
-                    i3di.date_int = md.max_date_int
-                    AND `kdjK` >= kdjk_day1
-                    AND `kdjd` >= kdjd_day1
-                    AND wr_6 >= wr_6_day1
-                    AND cci >= cci_day1
-                    AND i3di.code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-                    AND (`kdjk` <= 45)
-                    AND (`kdjd` <= 45)
-                    AND (`kdjj` <= 75)
-                GROUP BY
-                    md.max_date_int
-            ),
-            down_sentiment AS (
-                SELECT
-                    md.max_date_int AS date_int,
-                    ROUND(IFNULL((COUNT(i3di.date_int) / 10.0) * 100, 0)) AS `指数下跌情绪`
-                FROM
-                    max_date md
-                -- 左连接确保即使无符合条件数据也能显示最大日期
-                LEFT JOIN index_3day_indicators i3di ON 
-                    i3di.date_int = md.max_date_int
-                    AND `kdjK` <= kdjk_day1
-                    AND `kdjd` <= kdjd_day1
-                    AND wr_6 <= wr_6_day1
-                    AND cci <= cci_day1
-                    AND cci_day1 <= cci_day2
-                    AND i3di.code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-                    AND (`kdjk` >= 70)
-                    AND (`kdjd` >= 60)
-                    AND (abs(`wr_6`) <= 70)
-                GROUP BY
-                    md.max_date_int
-            )
-            SELECT
-                us.date_int,
-                us.`指数上涨情绪`,
-                ds.`指数下跌情绪`,
-                CASE
-                    WHEN us.`指数上涨情绪` = 100 AND ds.`指数下跌情绪` = 0 THEN '满仓梭哈，韭菜冲锋'
-                    WHEN us.`指数上涨情绪` > 0 AND ds.`指数下跌情绪` = 0 THEN '上行趋势，适当建仓'
-                    WHEN us.`指数上涨情绪` = 0 AND ds.`指数下跌情绪` = 0 THEN '震荡阶段，谨慎操作'
-                    WHEN us.`指数上涨情绪` = 0 AND ds.`指数下跌情绪` > 0 THEN '下行趋势，适当减仓'
-                    WHEN us.`指数上涨情绪` = 0 AND ds.`指数下跌情绪` = 100 THEN '一键清仓，韭菜快跑'
-                    ELSE '未知状态'
-                END AS `市场状态`
-            FROM
-                up_sentiment us
-            JOIN
-                down_sentiment ds ON us.date_int = ds.date_int;    
+                SELECT date_int,指数上涨情绪,指数下跌情绪,操作建议 FROM market_sentiment_a ORDER BY date_int DESC LIMIT 1;
             """
             cursor.execute(ratio_query)
             result = cursor.fetchone()
@@ -111,34 +51,36 @@ def main():
                 message1 = f"日期：{date_int}\n\n买入情绪：{up}%，卖出情绪：{down}%\n\n{mark}！"
             else:
                 message1 = f"暂无指数数据，可能系统崩了"
-
+            logging.info(f"操作建议: {message1}")
 
             # 编写 SQL 查询语句，将字符串比较修改为数值比较
             query = """
             SELECT 
                 csi.code,
                 csi.name,
-            --     csi.date_int,
+--                 csi.date_int,
             --     csi.wr_6,
             --     csi.kdjk,
             --     csi.kdjd,
             --     csi.kdjj,
-                s.industry,
+                csi.industry,
             --     t.code_int AS zijin_code_int,
                 t.jingliuru AS 净流入,
-                t.new_price AS 最新价,
-                t.turnover AS 换手率
+                csi.close AS 最新价,
+                csi.turnover AS 换手率
             FROM stock_3day_indicators csi 
-            JOIN cn_stock_info s ON s.code_int = csi.code_int
-            JOIN stock_zijin t ON t.code_int = csi.code_int AND t.date_int = csi.date_int
+            LEFT JOIN cn_stock_info s ON s.code_int = csi.code_int
+            LEFT JOIN stock_zijin t ON t.code_int = csi.code_int AND t.date_int = csi.date_int
             WHERE 
-                csi.kdjk <= '45'
-                AND csi.kdjd <= '45'
-                AND csi.kdjj <= '0' -- KDJ中J值小于0，超卖现象
-                AND csi.cci < '-130' -- CCI值低于-130，超卖现象
-                AND rsi_6 <= '30' -- rsi6低于30，超卖现象
-                AND ABS(csi.wr_6) >= 90 -- 威廉6日大于90，超卖现象
-                AND ABS(csi.wr_10) >= 90 -- 威廉10日大于90，超卖现象
+                csi.kdjk <= 45
+                AND csi.kdjd <= 45
+                AND csi.kdjj <= 10
+                AND csi.cci < -130
+                AND csi.cci > csi.cci_day1
+                AND rsi_6 <= 30
+                AND rsi_12 <= 45 
+                AND ABS(csi.wr_6) >= 90
+                AND ABS(csi.wr_10) >= 90
                 AND csi.date_int >= (SELECT MAX(date_int) FROM stock_3day_indicators)
                 AND csi.name NOT LIKE '%ST%'
                 AND s.industry not regexp '酿酒行业|美容护理|农药兽药|食品饮料|光伏设备|煤炭行业|造纸印刷|保险'

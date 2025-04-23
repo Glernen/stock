@@ -16,7 +16,6 @@ import pandas as pd
 import time
 import datetime 
 import mysql.connector
-import instock.core.tablestructure as tbs
 import instock.lib.database as mdb
 import pandas_market_calendars as mcal
 import pytz
@@ -38,6 +37,119 @@ def is_a_stock(code):
 # date_cols = ["f26", "f221"]
 
 
+
+# 基础字段结构（新增'en'字段）
+BASE_COLUMNS = {
+                'id' : {'type': INT, 'cn': 'id', 'size': 0,'map': None, 'en': 'id'},
+                'date':    {'type': DATE,  'cn': '日期', 'en': 'date', 'map': 0, 'size': 90},
+                'date_int':    {'type': INT,  'cn': '日期_int', 'en': 'date_int', 'map': None, 'size': 90},
+                'name': {'type': VARCHAR(20), 'cn': '名称', 'size': 120, 'en': 'name'},
+                'code': {'type': VARCHAR(6), 'cn': '代码', 'size': 70, 'en': 'code'},
+                'code_int': {'type': INT, 'cn': '代码', 'size': 70,'map': None, 'en': 'code_int'},
+                'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  
+                'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},  
+                'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70}, 
+                'low':     {'type': FLOAT, 'cn': '最低价', 'en': 'low', 'map': 4, 'size': 70},    
+                'volume':  {'type': FLOAT, 'cn': '成交量', 'en': 'volume', 'map': 5, 'size': 120},  
+                'amount':  {'type': FLOAT, 'cn': '成交额', 'en': 'amount', 'map': 6, 'size': 120}, 
+                'amplitude': {'type': FLOAT, 'cn': '振幅', 'en': 'amplitude', 'map': 7, 'size': 120},  
+                'quote_change': {'type': FLOAT, 'cn': '涨跌幅', 'en': 'quote_change', 'map': 8, 'size': 120},  
+                'ups_downs': {'type': FLOAT, 'cn': '涨跌额', 'en': 'ups_downs', 'map': 9, 'size': 120},  
+                'turnover': {'type': FLOAT, 'cn': '换手率', 'en': 'turnover', 'map': 10, 'size': 120} ,
+                'period': {'type': VARCHAR(20),'cn': '周期','en': 'period', 'size': 120} 
+    }
+
+def create_hist_data(asset_type: str, freq: str, cn_desc: str) -> dict:
+    """创建通用历史数据配置
+    asset_type: stock/etf/index
+    freq: daily/weekly/monthly
+    cn_desc: 中文周期描述
+    """
+    return {
+        'name': f'{asset_type}_hist_{freq}',
+        'cn': f'{ASSET_CN_MAP[asset_type]}的{cn_desc}行情数据库',
+        'columns': BASE_COLUMNS
+    }
+
+# 资产类型映射表（新增）
+ASSET_CN_MAP = {
+    'cn_stock': '股票',
+    'cn_etf': 'ETF',
+    'cn_index': '指数'
+}
+
+# 股票历史数据配置
+CN_STOCK_HIST_DAILY_DATA = create_hist_data('cn_stock', 'daily', '日')
+CN_STOCK_HIST_WEEKLY_DATA = create_hist_data('cn_stock', 'weekly', '周')
+CN_STOCK_HIST_MONTHLY_DATA = create_hist_data('cn_stock', 'monthly', '月')
+
+
+# ETF历史数据配置
+CN_ETF_HIST_DAILY_DATA = create_hist_data('cn_etf', 'daily', '日')  # 注意变量名修正
+CN_ETF_HIST_WEEKLY_DATA = create_hist_data('cn_etf', 'weekly', '周')
+CN_ETF_HIST_MONTHLY_DATA = create_hist_data('cn_etf', 'monthly', '月')
+
+# 指数历史数据配置
+CN_INDEX_HIST_DAILY_DATA = create_hist_data('cn_index', 'daily', '日')
+CN_INDEX_HIST_WEEKLY_DATA = create_hist_data('cn_index', 'weekly', '周')
+CN_INDEX_HIST_MONTHLY_DATA = create_hist_data('cn_index', 'monthly', '月')
+
+
+TABLE_REGISTRY = {
+
+    # 股票历史（新增周期维度）
+    # 股票历史
+    'cn_stock_hist_daily': CN_STOCK_HIST_DAILY_DATA,
+    'cn_stock_hist_weekly': CN_STOCK_HIST_WEEKLY_DATA,
+    'cn_stock_hist_monthly': CN_STOCK_HIST_MONTHLY_DATA,
+
+    # ETF历史
+    'cn_etf_hist_daily': CN_ETF_HIST_DAILY_DATA,
+    'cn_etf_hist_weekly': CN_ETF_HIST_WEEKLY_DATA,
+    'cn_etf_hist_monthly': CN_ETF_HIST_MONTHLY_DATA,
+
+    # 指数历史
+    'cn_index_hist_daily': CN_INDEX_HIST_DAILY_DATA,
+    'cn_index_hist_weekly': CN_INDEX_HIST_WEEKLY_DATA,
+    'cn_index_hist_monthly': CN_INDEX_HIST_MONTHLY_DATA,
+
+}
+
+
+def _get_sql_type(py_type):
+    """将 SQLAlchemy 类型转换为数据库原生类型字符串（增强版本）"""
+    # 处理实例类型（如 VARCHAR(20)）
+    if isinstance(py_type, VARCHAR):
+        return f"VARCHAR({py_type.length})"
+    elif isinstance(py_type, (DATE, DATETIME)):
+        return py_type.__class__.__name__.upper()
+    elif isinstance(py_type, FLOAT):
+        return "FLOAT"
+    elif isinstance(py_type, BIGINT):
+        return "BIGINT"
+    elif isinstance(py_type, INT):
+        return "INT"
+    elif isinstance(py_type, TINYINT):
+        # return "TINYINT"
+        return "BOOLEAN"  # 直接映射为 MySQL 的 BOOLEAN 类型
+
+    # 处理类类型（如 DATE 类）
+    if py_type == DATE:
+        return "DATE"
+    elif py_type == DATETIME:
+        return "DATETIME"
+    elif py_type == FLOAT:
+        return "FLOAT"
+    elif py_type == BIGINT:
+        return "BIGINT"
+    elif py_type == INT:
+        return "INT"
+    elif py_type == TINYINT:
+        return "BOOLEAN"  # 直接映射为 MySQL 的 BOOLEAN 类型
+        # return "TINYINT"
+
+    raise ValueError(f"Unsupported type: {py_type}")
+
 ########################################
 #获取沪市A股+深市A股历史数据并写入数据库
 def fetch_all_stock_hist(beg: str = None, end: str = None):
@@ -49,9 +161,9 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
 
     # 创建表
     for table_config in [
-        tbs.CN_STOCK_HIST_DAILY_DATA,
-        # tbs.CN_STOCK_HIST_WEEKLY_DATA,
-        # tbs.CN_STOCK_HIST_MONTHLY_DATA
+        CN_STOCK_HIST_DAILY_DATA,
+        # CN_STOCK_HIST_WEEKLY_DATA,
+        # CN_STOCK_HIST_MONTHLY_DATA
     ]:
         create_table_if_not_exists(table_config['name'])
 
@@ -99,9 +211,9 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
             #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
 
-    sync_and_write(tbs.CN_STOCK_HIST_DAILY_DATA['name'], daily_data)
-    # sync_and_write(tbs.CN_STOCK_HIST_WEEKLY_DATA['name'], weekly_data)
-    # sync_and_write(tbs.CN_STOCK_HIST_MONTHLY_DATA['name'], monthly_data)
+    sync_and_write(CN_STOCK_HIST_DAILY_DATA['name'], daily_data)
+    # sync_and_write(CN_STOCK_HIST_WEEKLY_DATA['name'], weekly_data)
+    # sync_and_write(CN_STOCK_HIST_MONTHLY_DATA['name'], monthly_data)
     
     # print(f"[Success] 股票历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
     print(f"[Success] 股票历史数据写入完成（日：{len(daily_data)}）")
@@ -117,9 +229,9 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
 
     # 创建表
     for table_config in [
-        tbs.CN_ETF_HIST_DAILY_DATA,
-        # tbs.CN_ETF_HIST_WEEKLY_DATA,
-        # tbs.CN_ETF_HIST_MONTHLY_DATA
+        CN_ETF_HIST_DAILY_DATA,
+        # CN_ETF_HIST_WEEKLY_DATA,
+        # CN_ETF_HIST_MONTHLY_DATA
     ]:
         create_table_if_not_exists(table_config['name'])
 
@@ -163,9 +275,9 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
             #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
 
-    sync_and_write(tbs.CN_ETF_HIST_DAILY_DATA['name'], daily_data)
-    # sync_and_write(tbs.CN_ETF_HIST_WEEKLY_DATA['name'], weekly_data)
-    # sync_and_write(tbs.CN_ETF_HIST_MONTHLY_DATA['name'], monthly_data)
+    sync_and_write(CN_ETF_HIST_DAILY_DATA['name'], daily_data)
+    # sync_and_write(CN_ETF_HIST_WEEKLY_DATA['name'], weekly_data)
+    # sync_and_write(CN_ETF_HIST_MONTHLY_DATA['name'], monthly_data)
     
     # print(f"[Success] 基金历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
     print(f"[Success] 基金历史数据写入完成（日：{len(daily_data)}）")
@@ -181,9 +293,9 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
 
     # 创建表
     for table_config in [
-        tbs.CN_INDEX_HIST_DAILY_DATA,
-        # tbs.CN_INDEX_HIST_WEEKLY_DATA,
-        # tbs.CN_INDEX_HIST_MONTHLY_DATA
+        CN_INDEX_HIST_DAILY_DATA,
+        # CN_INDEX_HIST_WEEKLY_DATA,
+        # CN_INDEX_HIST_MONTHLY_DATA
     ]:
         create_table_if_not_exists(table_config['name'])
 
@@ -227,9 +339,9 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
             #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
 
 
-    sync_and_write(tbs.CN_INDEX_HIST_DAILY_DATA['name'], daily_data)
-    # sync_and_write(tbs.CN_INDEX_HIST_WEEKLY_DATA['name'], weekly_data)
-    # sync_and_write(tbs.CN_INDEX_HIST_MONTHLY_DATA['name'], monthly_data)
+    sync_and_write(CN_INDEX_HIST_DAILY_DATA['name'], daily_data)
+    # sync_and_write(CN_INDEX_HIST_WEEKLY_DATA['name'], weekly_data)
+    # sync_and_write(CN_INDEX_HIST_MONTHLY_DATA['name'], monthly_data)
     
     # print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
     print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}）")
@@ -241,9 +353,9 @@ def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_ty
 
         # 根据数据类型选择配置
         table_config_map = {
-            "stock": tbs.CN_STOCK_HIST_DAILY_DATA,
-            "etf": tbs.CN_ETF_HIST_DAILY_DATA,
-            "index": tbs.CN_INDEX_HIST_DAILY_DATA
+            "stock": CN_STOCK_HIST_DAILY_DATA,
+            "etf": CN_ETF_HIST_DAILY_DATA,
+            "index": CN_INDEX_HIST_DAILY_DATA
         }
         table_config = table_config_map[data_type]
 
@@ -410,7 +522,7 @@ def create_table_if_not_exists(table_name):
             `code_int` INT,
             `code` VARCHAR(6),
             `name` VARCHAR(20)
-        );
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     """
     DBManager.execute_sql(create_table_sql)
 
@@ -498,7 +610,7 @@ def 同步表结构(conn, table_name, data_columns):
         # print(f"[DEBUG] 数据库现有字段：{existing_columns}")
 
         # 获取配置表字段
-        table_config = tbs.TABLE_REGISTRY.get(table_name, {})
+        table_config = TABLE_REGISTRY.get(table_name, {})
         all_required_columns = list(table_config.get('columns', {}).keys())
         # print(f"[DEBUG] 配置表要求字段：{all_required_columns}")
 
@@ -511,7 +623,7 @@ def 同步表结构(conn, table_name, data_columns):
                     if col in all_required_columns:
                         # 从配置获取字段类型
                         col_info = table_config['columns'][col]
-                        sql_type = tbs._get_sql_type(col_info['type'])
+                        sql_type = _get_sql_type(col_info['type'])
                         
                         # 执行添加字段
                         alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col}` {sql_type};"

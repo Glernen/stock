@@ -501,7 +501,7 @@ def create_table_if_not_exists(table_name):
             `code_int` INT,
             `code` VARCHAR(6),
             `name` VARCHAR(20)
-        );
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     """
     DBManager.execute_sql(create_table_sql)
 
@@ -568,7 +568,7 @@ def create_table_if_not_exists(table_name):
                 conn.close()
 
     # 添加索引
-    create_index("idx_date_code_int", ["date_int", "code_int"], is_unique=True)
+    create_index("idx_unique_int", ["date_int", "code_int"], is_unique=True)
     create_index("idx_code_int", ["code_int"])
     create_index("idx_date_int", ["date_int"])
 
@@ -779,7 +779,7 @@ def sync_table_structure(table_name: str, data_columns: List[str]):
                         `code_int` INT,
                         `code` VARCHAR(6),
                         `name` VARCHAR(20)
-                    );
+                    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
                 """
                 cursor.execute(create_sql)
                 print(f"创建基础表 {table_name}")
@@ -938,8 +938,8 @@ def main():
 
        
 
-    batch_size = 100
-    max_workers = 4
+    batch_size = 200
+    max_workers = 6
     
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         for data_type in ['etf', 'index', 'stock']:

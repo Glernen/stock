@@ -114,12 +114,6 @@ def guess_buy(start_date_int, end_date_int=None):
         raise
 
 
-
-
-
-
-
-
 # 修改表结构（新增字段）
 def create_optimized_table():
     table_name = "cn_stock_indicators_buy"
@@ -131,15 +125,15 @@ def create_optimized_table():
         `code` VARCHAR(6) NOT NULL COMMENT '股票代码',
         `code_int` INT NOT NULL COMMENT '整数格式股票代码',
         `name` VARCHAR(20) COMMENT '股票名称',
-        `close` DECIMAL(10,2) COMMENT '收盘价',
-        `turnover` DECIMAL(18,2) COMMENT '成交额',
+        `close` FLOAT COMMENT '收盘价',
+        `turnover` FLOAT COMMENT '成交额',
         `industry` VARCHAR(50) COMMENT '所属行业',
         /* 新增回测字段 */
         {' ,'.join([f'`{col}` FLOAT' for col in tbs.TABLE_CN_STOCK_BACKTEST_DATA['columns']])},
         UNIQUE KEY `idx_unique` (`date_int`,`code_int`),
         KEY `idx_code` (`code_int`),
         KEY `idx_date` (`date_int`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='选股结果表';
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='选股结果表';
     """
     
     # 使用新的连接检查并创建表
@@ -183,21 +177,6 @@ def optimized_data_insert(data):
     except Exception as e:
         logging.error(f"数据插入失败: {e}")
         raise
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 def main():

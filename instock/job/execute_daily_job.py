@@ -32,7 +32,8 @@ import basic_hist_data as basic_hist_data
 import indicators_data_daily as indicators_data_daily
 import threeday_indicators  as threeday_indicators
 import indicators_buy as indicators_buy
-
+import market_sentiment_a as market_sentiment_a
+import industry_data as industry_data
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -42,7 +43,7 @@ def main():
     start = time.time()
     _start = datetime.datetime.now()
     logging.info("######## 任务执行时间: %s #######" % _start.strftime("%Y-%m-%d %H:%M:%S.%f"))
-    # 第1.1步创建数据库
+    # 第1步创建数据库
     bj.main()
     # 第1.2步创建数据库
 
@@ -57,6 +58,12 @@ def main():
 
     # 指标数据处理
     threeday_indicators.main()
+
+    # 指标数据处理
+    market_sentiment_a.main()
+
+    # 行业数据处理
+    industry_data.main()
     
     # 买入策略
     indicators_buy.main()

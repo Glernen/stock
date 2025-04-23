@@ -48,9 +48,12 @@ stock_fund_flow_individual_df = stock_fund_flow_individual_df.assign(
     change_rate=stock_fund_flow_individual_df["涨跌幅"].str.replace('%', '').astype(float),
     turnover=stock_fund_flow_individual_df["换手率"].str.replace('%', '').astype(float),
     liuru=stock_fund_flow_individual_df["流入资金"].apply(convert_amount),
+    liuru_cn= stock_fund_flow_individual_df["流入资金"],
     liuchu=stock_fund_flow_individual_df["流出资金"].apply(convert_amount),
-    jingliuru=stock_fund_flow_individual_df["净额"].apply(convert_amount)
-)[['date', 'date_int', 'code', 'code_int', 'name','new_price','change_rate','turnover','liuru','liuchu','jingliuru']]
+    liuchu_cn=stock_fund_flow_individual_df["流出资金"],
+    jingliuru=stock_fund_flow_individual_df["净额"].apply(convert_amount),
+    jingliuru_cn=stock_fund_flow_individual_df["净额"]
+)[['date', 'date_int', 'code', 'code_int', 'name','new_price','change_rate','turnover','liuru','liuru_cn','liuchu','liuchu_cn','jingliuru','jingliuru_cn']]
 
 print(f'{stock_fund_flow_individual_df}')
 
@@ -100,19 +103,22 @@ def create_table():
         `change_rate` FLOAT COMMENT '涨跌幅（百分比）',
         `turnover` FLOAT COMMENT '换手率（百分比）',
         `liuru` BIGINT COMMENT '流入资金（单位：元）',
+        `liuru_cn` VARCHAR(50) COMMENT '流入资金',
         `liuchu` BIGINT COMMENT '流出资金（单位：元）',
+        `liuchu_cn` VARCHAR(50) COMMENT '流出资金',
         `jingliuru` BIGINT COMMENT '净额（单位：元）',
+        `jingliuru_cn` VARCHAR(50) COMMENT '净额',
         UNIQUE KEY `uniq_idx` (`date_int`, `code_int`),
         INDEX `date_idx` (`date`),
         INDEX `code_idx` (`code_int`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     """
     DBManager.execute_sql(create_sql)
 
 def batch_insert_data(df, batch_size=500):
     """批量插入数据"""
     columns = ['date', 'date_int', 'code', 'code_int', 'name', 
-              'new_price', 'change_rate', 'turnover', 'liuru', 'liuchu', 'jingliuru']
+              'new_price', 'change_rate', 'turnover', 'liuru', 'liuru_cn','liuchu','liuchu_cn','jingliuru','jingliuru_cn']
     
     # 使用参数化占位符
     sql_template = """
@@ -123,8 +129,11 @@ def batch_insert_data(df, batch_size=500):
         change_rate=VALUES(change_rate),
         turnover=VALUES(turnover),
         liuru=VALUES(liuru),
+        liuru_cn=VALUES(liuru_cn),
         liuchu=VALUES(liuchu),
-        jingliuru=VALUES(jingliuru);
+        liuchu_cn=VALUES(liuchu_cn),
+        jingliuru=VALUES(jingliuru),
+        jingliuru_cn=VALUES(jingliuru_cn);
     """.format(', '.join(columns), '{}')
 
     for i in tqdm(range(0, len(df), batch_size), desc="插入进度"):
@@ -142,8 +151,11 @@ def batch_insert_data(df, batch_size=500):
                 row['change_rate'],
                 row['turnover'],
                 row['liuru'],
+                f''' '{row['liuru_cn'].replace("'", "''")}' ''',
                 row['liuchu'],
-                row['jingliuru']
+                f''' '{row['liuchu_cn'].replace("'", "''")}' ''',
+                row['jingliuru'],
+                f''' '{row['jingliuru_cn'].replace("'", "''")}' '''
             )
             values.append(f"({', '.join(map(str, val))})")
         

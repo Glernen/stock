@@ -107,7 +107,7 @@ def main():
             SELECT 
                 csi.code,
                 csi.name,
-            --     csi.date_int,
+--                 csi.date_int,
             --     csi.wr_6,
             --     csi.kdjk,
             --     csi.kdjd,
@@ -118,16 +118,18 @@ def main():
                 t.new_price AS 最新价,
                 t.turnover AS 换手率
             FROM stock_3day_indicators csi 
-            JOIN cn_stock_info s ON s.code_int = csi.code_int
-            JOIN stock_zijin t ON t.code_int = csi.code_int AND t.date_int = csi.date_int
+            LEFT JOIN cn_stock_info s ON s.code_int = csi.code_int
+            LEFT JOIN stock_zijin t ON t.code_int = csi.code_int AND t.date_int = csi.date_int
             WHERE 
-                csi.kdjk <= '45'
-                AND csi.kdjd <= '45'
-                AND csi.kdjj <= '0' -- KDJ中J值小于0，超卖现象
-                AND csi.cci < '-130' -- CCI值低于-130，超卖现象
-                AND rsi_6 <= '30' -- rsi6低于30，超卖现象
-                AND ABS(csi.wr_6) >= 90 -- 威廉6日大于90，超卖现象
-                AND ABS(csi.wr_10) >= 90 -- 威廉10日大于90，超卖现象
+                csi.kdjk <= 45
+                AND csi.kdjd <= 45
+                AND csi.kdjj <= 10
+                AND csi.cci < -130
+                AND csi.cci > csi.cci_day1
+                AND rsi_6 <= 30
+                AND rsi_12 <= 45 
+                AND ABS(csi.wr_6) >= 90
+                AND ABS(csi.wr_10) >= 90
                 AND csi.date_int >= (SELECT MAX(date_int) FROM stock_3day_indicators)
                 AND csi.name NOT LIKE '%ST%'
                 AND s.industry not regexp '酿酒行业|美容护理|农药兽药|食品饮料|光伏设备|煤炭行业|造纸印刷|保险'

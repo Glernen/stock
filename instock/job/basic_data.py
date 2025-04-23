@@ -350,6 +350,7 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
                     stock_info_df["market_id"].astype(str) + "." +
                     stock_info_df["code"].astype(str).str.zfill(6)
                 )
+            # stock_info_df.loc[:, "industry"] = fixed_date
             print(f"[Success] stock_info_df：{stock_info_df}")
             print(f"[Success] stock_info_df-columns：{stock_info_df.columns}")
 
@@ -972,6 +973,247 @@ def index_spot_data(
 
 
 
+########################################
+#获取行业实时股票数据数据并写入数据库
+
+def stock_zh_a_spot_em() -> pd.DataFrame:
+    '''
+    东方财富网-沪深京 A 股-行业实时行情
+    https://quote.eastmoney.com/center/gridlist.html#industry_board
+    :return: 行业实时行情
+    :rtype: pandas.DataFrame
+    '''
+    #实时行情数据主表
+    table_name = tbs.TABLE_CN_STOCK_SPOT['name']
+    table_name_cols = tbs.TABLE_CN_STOCK_SPOT['columns']
+
+    # 生成字段字符串，确保cols[k]中存在'map'键，并且其值不为空。
+    fields = ','.join(
+        table_name_cols[k]['map']
+        for k in table_name_cols
+        if 'map' in table_name_cols[k] and table_name_cols[k]['map']
+    )
+    
+    # map生成中文映射字典
+    cn_name = {
+        table_name_cols[k]['map']: table_name_cols[k]['cn']
+        for k in table_name_cols
+        if 'map' in table_name_cols[k] and table_name_cols[k]['map']
+    }
+    
+    # map生成英文映射字典
+    en_name = {
+        table_name_cols[k]['map']: table_name_cols[k]['en']
+        for k in table_name_cols
+        if 'map' in table_name_cols[k] and table_name_cols[k]['map']
+    }
+
+    page_size = 1000
+    page_current = 1
+    url = "http://82.push2.eastmoney.com/api/qt/clist/get"
+    # 初始请求参数，先获取总数据量和 page_size
+    params = {
+        "pn": "1",
+        "pz": '1000',
+        "po": "1",
+        "np": "1",
+        "ut": "bd1d9ddb04089700cf9c27f6f7426281",
+        "fltt": "2",
+        "invt": "2",
+        "fid": "f3",
+        "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048",
+        # "fields": "f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f14,f15,f16,f17,f18,f20,f21,f22,f23,f24,f25,f26,f37,f38,f39,f40,f41,f45,f46,f48,f49,f57,f61,f100,f112,f113,f114,f115,f221",
+        "fields": fields,
+        "_": "1623833739532",
+    }
+    try:
+        temp_df = fetch_zh_a_spot_data(url,params,page_size,"pn")# 将数据中NaN空数据进行替换：替换np.nan为None
+
+        # 定义数值列清单
+        numeric_cols = [
+            'f2','f3','f4','f5','f6','f7','f8','f9','f10','f11',
+            'f15','f16','f17','f18','f20','f21','f22','f23','f24','f25',
+            'f37','f38','f39','f40','f41','f45','f46','f48','f49','f57','f61',
+            'f112','f113','f114','f115'
+        ]
+                
+        # 执行类型转换
+        temp_df[numeric_cols] = temp_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
+
+        date_cols = ["f26", "f221"]
+        temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))         
+        temp_df.rename(columns=en_name, inplace=True) # 将默认列名改为英文列名
+
+        # 获取上证交易所日历
+        sh_cal = mcal.get_calendar('SSE')
+        latest_trade_date = sh_cal.schedule(start_date='2020-01-01', end_date=pd.Timestamp.today()).index[-1].strftime("%Y-%m-%d")
+        temp_df.loc[:, "date"] = latest_trade_date
+        temp_df.loc[:, "date_int"] = temp_df["date"].astype(str).str.replace('-', '')
+
+        temp_df = temp_df.loc[temp_df['new_price'].apply(is_open)]
+        temp_df = temp_df.replace({np.nan: None}) 
+
+        # temp_df["date"] = pd.to_datetime("today").strftime("%Y-%m-%d")  # 添加日期字段
+        # print(f'实时行情数据主表{temp_df}')
+
+
+        # ==== 主表（cn_stock_spot）写入逻辑 ====
+        try:
+            # 1. 创建表（如果不存在）
+            create_table_if_not_exists(table_name)
+            
+            # 2. 同步表结构（动态添加字段）
+            conn = DBManager.get_new_connection()
+            try:
+                同步表结构(conn, table_name, temp_df.columns)
+            finally:
+                if conn.is_connected():
+                    conn.close()
+            
+            # 3. 生成并执行SQL
+            try:
+                # 生成批量SQL
+                sql_batches = sql_batch_generator(
+                    table_name=table_name,
+                    data=temp_df,
+                    batch_size=1000  # 根据实际情况调整
+                )
+                
+                # 执行批量插入
+                execute_batch_sql(sql_batches)
+                print(f"[Success] 股票行情主表批量写入完成，数据量：{len(temp_df)}")
+            except Exception as e:
+                print(f"[Critical] 股票行情主表批量写入失败: {str(e)}")
+        except Exception as e:
+            print(f"[Error] 股票主表写入失败: {e}")
+        #################################################
+
+
+        #在temp_df只获取stock_info_cols = tbs.TABLE_STOCK_INIT['columns']中配置的字段生成股票基础表
+
+        #股票基础数据表
+        stock_info = tbs.TABLE_STOCK_INIT['name'] # cn_stock_info
+        stock_info_cols = tbs.TABLE_STOCK_INIT['columns']
+
+        
+        # ==== 基础信息表（cn_stock_info）写入逻辑 ====
+        try:
+            # 1. 筛选需要的列
+            required_columns = [col_info['en'] for col_info in stock_info_cols.values() if 'en' in col_info]
+            existing_columns = [col for col in required_columns if col in temp_df.columns]
+            if not existing_columns:
+                print("[Error] 无有效列可写入基础表")
+                return pd.DataFrame()
+
+            stock_info_df = temp_df[existing_columns]
+
+            # 手动设置固定日期（例如 1212-12-12）做索引使用
+            fixed_date = "2222-12-22"
+            # fixed_date = latest_trade_date
+            stock_info_df = temp_df[existing_columns].copy()  # 显式创建独立副本
+            stock_info_df.loc[:, "date"] = fixed_date
+            stock_info_df.loc[:, "date_int"] = stock_info_df["date"].astype(str).str.replace('-', '')
+            if "market_id" in stock_info_df.columns and "code" in stock_info_df.columns:
+                stock_info_df.loc[:, "code_market"] = (
+                    stock_info_df["market_id"].astype(str) + "." +
+                    stock_info_df["code"].astype(str).str.zfill(6)
+                )
+            # stock_info_df.loc[:, "industry"] = fixed_date
+            print(f"[Success] stock_info_df：{stock_info_df}")
+            print(f"[Success] stock_info_df-columns：{stock_info_df.columns}")
+
+            
+            # 2. 创建表（如果不存在）
+            create_table_if_not_exists(stock_info)
+            
+            # 3. 同步表结构（动态添加字段）
+            conn = DBManager.get_new_connection()
+            try:
+                同步表结构(conn, stock_info, stock_info_df.columns)
+            finally:
+                if conn.is_connected():
+                    conn.close()
+            
+            # 4. 生成并执行SQL
+            try:
+                # 生成批量SQL
+                sql_batches = sql_batch_generator(
+                    table_name=stock_info,
+                    data=stock_info_df,
+                    batch_size=1000  # 根据实际情况调整
+                )
+                
+                # 执行批量插入
+                execute_batch_sql(sql_batches)
+                
+                print(f"[Success] 股票基础信息表写入完成，数据量：{len(stock_info_df)}")
+            except Exception as e:
+                print(f"[Critical] 股票基础表批量写入失败: {str(e)}")
+
+            return temp_df
+        except Exception as e:
+            print(f"[Error] 股票写入失败: {e}")
+    except Exception as e:
+        print(f"东方财富网-沪深京 A 股-实时行情处理失败: {e}")
+        return pd.DataFrame()
+
+
+
+#获取沪市A股+深市A股实时股票数据，接口请求数据
+def fetch_zh_a_spot_data(
+    url: str,
+    params: Dict,
+    page_size: int,
+    page_param_name: str = "pn",  # 分页参数名应为页码参数（pn）
+    start_page: int = 1           # 起始页码默认为1
+    ) -> pd.DataFrame:
+
+    first_page_params = {
+        **params,
+        "pz": page_size,          # 固定每页大小参数为pz
+        page_param_name: start_page  # 起始页码
+    }
+    try:
+        r = requests.get(url, params=first_page_params)
+        r.raise_for_status()
+        data_json = r.json()
+        data_count = data_json["data"]["total"]
+        page_size = len(data_json["data"]["diff"])
+        page_total = math.ceil(data_count / page_size)
+        data = data_json["data"]["diff"]
+        print(f"[Debug] 总数据量: {data_count}, 总页数: {page_total}")
+    except Exception as e:
+        print(f"初始页获取失败: {str(e)}")
+        return pd.DataFrame()
+
+    # 2. 多线程请求剩余页
+    def fetch_page(page: int) -> List[Dict]:
+        page_params = {
+            **params,
+            "pz": page_size,       # 固定每页大小
+            page_param_name: page   # 正确设置页码参数
+        }
+        try:
+            r = requests.get(url, params=page_params)
+            r.raise_for_status()
+            return r.json()["data"]["diff"]
+        except Exception as e:
+            print(f"第{page}页请求失败: {e}")
+            return []
+
+    with ThreadPoolExecutor() as executor:
+        futures = {
+            executor.submit(fetch_page, page): page
+            for page in range(start_page + 1, page_total + 1)  # 从第二页开始
+        }
+
+        # 进度条显示
+        for future in tqdm(as_completed(futures), total=len(futures), desc="并发拉取数据"):
+            page_data = future.result()
+            if page_data:
+                data.extend(page_data)
+
+    return pd.DataFrame(data)
 
 
 """
@@ -1061,7 +1303,7 @@ def create_table_if_not_exists(table_name):
             `code_int` INT,
             `code` VARCHAR(6),
             `name` VARCHAR(20)
-        );
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
     """
     DBManager.execute_sql(create_table_sql)
 
@@ -1202,7 +1444,7 @@ def sql语句生成器(table_name, data, batch_size=500):
 
     # 定义字段和更新子句
     columns = ', '.join([f"`{col}`" for col in data.columns])
-    unique_keys = ['date', 'code']
+    unique_keys = ['date_int', 'code_int']
     update_clause = ', '.join(
         [f"`{col}`=VALUES(`{col}`)" 
          for col in data.columns if col not in unique_keys]
@@ -1248,7 +1490,7 @@ def sql_batch_generator(table_name, data, batch_size=500):
         data.insert(0, 'code_int', data['code'].astype(int))
 
     columns = ', '.join([f"`{col}`" for col in data.columns])
-    unique_keys = ['date', 'code']
+    unique_keys = ['date_int', 'code_int']
     update_clause = ', '.join(
         [f"`{col}`=VALUES(`{col}`)" 
          for col in data.columns if col not in unique_keys]
