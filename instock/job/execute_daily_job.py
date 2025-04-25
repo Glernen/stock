@@ -34,6 +34,8 @@ import threeday_indicators  as threeday_indicators
 import indicators_buy as indicators_buy
 import market_sentiment_a as market_sentiment_a
 import industry_data as industry_data
+import industry_sentiment_a as industry_sentiment_a
+import stock_zijin as stock_zijin
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -47,6 +49,8 @@ def main():
     bj.main()
     # 第1.2步创建数据库
 
+    stock_zijin.main()
+
     # 获取实时股票、基金、指数数据并同时创建和写入数据主表，数据基础表
     basic_data.main()
     
@@ -59,11 +63,14 @@ def main():
     # 指标数据处理
     threeday_indicators.main()
 
-    # 指标数据处理
+    # 指标情绪
     market_sentiment_a.main()
 
     # 行业数据处理
     industry_data.main()
+
+    # 行业情绪
+    industry_sentiment_a.main()
     
     # 买入策略
     indicators_buy.main()

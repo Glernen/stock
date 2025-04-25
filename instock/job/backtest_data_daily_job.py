@@ -41,12 +41,25 @@ TABLE_CN_STOCK_INDICATORS_BUY = {
         'code': {'type': VARCHAR(6)},
         'code_int': {'type': INT},
         'name': {'type': VARCHAR(20)},
-        'close': {'type': FLOAT},
-        'turnover': {'type': FLOAT},
-        'industry': {'type': VARCHAR(20)},
+        'strategy': {'type':VARCHAR(50) },
+        'close': {'type':FLOAT },
+        'kdjj': {'type':FLOAT },
+        'turnover': {'type':FLOAT },
+        'jingliuru_cn': {'type':VARCHAR(50) },
+        'industry': {'type':VARCHAR(50) },
+        'up_sentiment': {'type':INT },
+        'down_sentiment': {'type':INT },
+        'industry_kdjj': {'type':FLOAT },
+        'industry_kdjj_day1': {'type':FLOAT },
+        'industry_kdj': {'type':VARCHAR(50) },
+        'industry_wr': {'type':VARCHAR(50) },
+        'industry_cci': {'type':VARCHAR(50) },
+        'industry_sentiment': {'type':VARCHAR(50) },
         **{f'rate_{i}': {'type': FLOAT} for i in range(1, RATE_FIELDS_COUNT+1)}
     }
 }
+
+
 
 TABLE_CN_STOCK_INDICATORS_SELL = {
     'name': 'cn_stock_indicators_sell',
@@ -56,9 +69,20 @@ TABLE_CN_STOCK_INDICATORS_SELL = {
         'code': {'type': VARCHAR(6)},
         'code_int': {'type': INT},
         'name': {'type': VARCHAR(20)},
-        'close': {'type': FLOAT},
-        'turnover': {'type': FLOAT},
-        'industry': {'type': VARCHAR(20)},
+        'strategy': {'type':VARCHAR(50) },
+        'close': {'type':FLOAT },
+        'kdjj': {'type':FLOAT },
+        'turnover': {'type':FLOAT },
+        'jingliuru_cn': {'type':VARCHAR(50) },
+        'industry': {'type':VARCHAR(50) },
+        'up_sentiment': {'type':INT },
+        'down_sentiment': {'type':INT },
+        'industry_kdjj': {'type':FLOAT },
+        'industry_kdjj_day1': {'type':FLOAT },
+        'industry_kdj': {'type':VARCHAR(50) },
+        'industry_wr': {'type':VARCHAR(50) },
+        'industry_cci': {'type':VARCHAR(50) },
+        'industry_sentiment': {'type':VARCHAR(50) },
         **{f'rate_{i}': {'type': FLOAT} for i in range(1, RATE_FIELDS_COUNT+1)}
     }
 }
@@ -66,7 +90,11 @@ TABLE_CN_STOCK_INDICATORS_SELL = {
 # 回测字段配置
 backtest_columns = [
     'date_int', 'code_int' , 'code', 'date', 'name', 
-    'close', 'turnover', 'industry'
+    'strategy', 'close', 'kdjj', 'turnover', 'jingliuru_cn', 
+    'industry ', 'up_sentiment', 'down_sentiment', 
+    'industry_kdjj', 'industry_kdjj_day1', 'industry_kdj', 
+    'industry_wr', 'industry_cci', 'industry_sentiment'
+
 ] + [f'rate_{i}' for i in range(1, 101)]
 
 class StockHistData:
@@ -102,7 +130,7 @@ def prepare():
     if hist_data is None:
         return
 
-    print(f'{hist_data}')
+    # print(f'{hist_data}')
 
     with concurrent.futures.ThreadPoolExecutor() as executor:
         for table in tables:
@@ -115,12 +143,12 @@ def process_table(table, hist_data):
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         cursor.execute(f"""
-            SELECT date, date_int, code , code_int, name, close, turnover, industry 
+            SELECT date, date_int, code , code_int, name, strategy, close, kdjj, turnover, jingliuru_cn, industry , up_sentiment, down_sentiment, industry_kdjj, industry_kdjj_day1, industry_kdj, industry_wr, industry_cci, industry_sentiment
             FROM {table_name}
             WHERE rate_60 IS NULL
         """)
         stocks = cursor.fetchall()
-        print(f"需处理股票: {stocks}")
+        # print(f"需处理股票: {stocks}")
         print(f"需处理股票数量: {len(stocks)}")
 
         results = {}
@@ -132,15 +160,15 @@ def process_table(table, hist_data):
                 
                 # 从预加载数据中筛选当前股票的数据
                 stock_data = hist_data.xs(code_int, level='code_int', drop_level=False)
-                print(f"\n股票{code_int}总数据量：{len(stock_data)}条")
+                # print(f"\n股票{code_int}总数据量：{len(stock_data)}条")
                 
                 # 找到当前日期在时间序列中的位置
                 date_index = stock_data.index.get_loc(key)
-                print(f"当前记录在时间序列中的位置：{date_index}")
+                # print(f"当前记录在时间序列中的位置：{date_index}")
                 
                 # 获取从当前日期开始往后100天的数据
                 needed_data = stock_data.iloc[date_index:date_index+100]
-                print(f"可用于计算的数据量：{len(needed_data)}")
+                # print(f"可用于计算的数据量：{len(needed_data)}")
                 
                 rates = calculate_rates(stock, needed_data)
                 results[key] = rates
@@ -161,10 +189,10 @@ def process_table(table, hist_data):
                     continue
                 
                 # 添加详细日志输出
-                print(f"\n正在构建更新数据：")
-                print(f"日期: {date_int} 代码: {code_int}")
-                print(f"原始数据: {current_stock}")
-                print(f"收益率数据长度: {len(rates)} 前3项: {rates[:3]}")
+                # print(f"\n正在构建更新数据：")
+                # print(f"日期: {date_int} 代码: {code_int}")
+                # print(f"原始数据: {current_stock}")
+                # print(f"收益率数据长度: {len(rates)} 前3项: {rates[:3]}")
 
                 # 关键修改1：转换日期格式和数值类型
                 formatted_date = current_stock[0].strftime('%Y-%m-%d')  # 转换datetime.date为字符串
@@ -174,14 +202,26 @@ def process_table(table, hist_data):
                     current_stock[2],  # code
                     formatted_date,  #date
                     current_stock[4],  # name  
-                    float(current_stock[5]),  # close
-                    float(current_stock[6]),  # turnover
-                    current_stock[7],  # industry
+                    current_stock[5] if len(current_stock) > 5 else '',  # strategy
+                    float(current_stock[6]) if len(current_stock) > 6 and current_stock[6] is not None else 0.0,  # close
+                    float(current_stock[7]) if len(current_stock) > 7 and current_stock[7] is not None else 0.0,  # kdjj
+                    float(current_stock[8]) if len(current_stock) > 8 and current_stock[8] is not None else 0.0,  # turnover
+                    str(current_stock[9]) if len(current_stock) > 9 and current_stock[9] is not None else '',  # jingliuru_cn
+                    current_stock[10] if len(current_stock) > 10 and current_stock[10] is not None else '',   # industry
+                    int(current_stock[11]) if len(current_stock) > 11 and current_stock[11] is not None else 404, # up_sentiment
+                    int(current_stock[12]) if len(current_stock) > 12 and current_stock[12] is not None else 404,  # down_sentiment
+                    float(current_stock[13]) if len(current_stock) > 13 and current_stock[13] is not None else 0.0,  # industry_kdjj
+                    float(current_stock[14]) if len(current_stock) > 14 and current_stock[14] is not None else 0.0,  # industry_kdjj_day1
+                    current_stock[15] if len(current_stock) > 15 and current_stock[15] is not None else '',  # industry_kdj
+                    current_stock[16] if len(current_stock) > 16 and current_stock[16] is not None else '',  # industry_wr
+                    current_stock[17] if len(current_stock) > 17 and current_stock[17] is not None else '',  # industry_cci
+                    current_stock[18] if len(current_stock) > 18 and current_stock[18] is not None else '',  # industry_sentiment
                     *formatted_rates,   # rate_1~rate_100
                 ] + [
                     date_int,  # WHERE条件
                     code_int
                 ]
+
                 print(f"参数数量验证: {len(update_row)} 应等于: {len(backtest_columns[2:])+2}")
                 print(f"示例数据：{update_row[:8]}...{update_row[-3:]}")
                 update_data.append(tuple(update_row))
@@ -231,8 +271,8 @@ def calculate_rates(stock, stock_data):
             return [None]*100
             
         # 修正索引访问方式
-        print(f"\n当前基准数据：")
-        print(f"日期：{stock_data.index[0][0]} 收盘价：{stock_data.iloc[0]['close']}")
+        # print(f"\n当前基准数据：")
+        # print(f"日期：{stock_data.index[0][0]} 收盘价：{stock_data.iloc[0]['close']}")
         
         base_close = stock_data.iloc[0]['close']
         rates = []
@@ -244,7 +284,7 @@ def calculate_rates(stock, stock_data):
             row = stock_data.iloc[i]
             pct = round((row['close'] - base_close)/base_close*100, 2)
             rates.append(pct)
-            print(f"第{i}天 {row.name[0]} 收盘价：{row['close']} 收益率：{pct}%")
+            # print(f"第{i}天 {row.name[0]} 收盘价：{row['close']} 收益率：{pct}%")
             
         # 补足剩余天数
         rates += [None]*(100 - len(rates))
@@ -290,7 +330,7 @@ def create_table(table):
             CREATE TABLE {table['name']} (
                 id INT AUTO_INCREMENT PRIMARY KEY,
                 {', '.join(columns)},
-                INDEX idx_unique (date_int, code_int)
+                INDEX idx_unique (date_int, code_int, strategy)
             )
         """
         cursor.execute(create_sql)
