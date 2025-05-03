@@ -36,6 +36,7 @@ import market_sentiment_a as market_sentiment_a
 import industry_data as industry_data
 import industry_sentiment_a as industry_sentiment_a
 import stock_zijin as stock_zijin
+import strategy_etf_buy as strategy_etf_buy
 
 __author__ = 'myh '
 __date__ = '2023/3/10 '
@@ -74,6 +75,9 @@ def main():
     
     # 买入策略
     indicators_buy.main()
+
+    # etf 买入策略
+    strategy_etf_buy.main()
 
     # 第2.1步创建股票基础数据表
     # hdj.main()
