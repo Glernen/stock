@@ -14,7 +14,11 @@ import requests
 import numpy as np
 import pandas as pd
 import time
+<<<<<<< Updated upstream
 import datetime 
+=======
+import datetime
+>>>>>>> Stashed changes
 import mysql.connector
 import instock.core.tablestructure as tbs
 import instock.lib.database as mdb
@@ -24,7 +28,11 @@ from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
+<<<<<<< Updated upstream
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
+=======
+from instock.lib.database import db_host, db_user, db_password, db_database, db_charset
+>>>>>>> Stashed changes
 import stock_zijin as stock_zijin
 import indicators_data_daily as indicators_data_daily
 import threeday_indicators as threeday_indicators
@@ -105,14 +113,22 @@ def industry_zh_a_spot_em() -> pd.DataFrame:
         for k in table_name_cols
         if 'map' in table_name_cols[k] and table_name_cols[k]['map']
     )
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     # map生成中文映射字典
     cn_name = {
         table_name_cols[k]['map']: table_name_cols[k]['cn']
         for k in table_name_cols
         if 'map' in table_name_cols[k] and table_name_cols[k]['map']
     }
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     # map生成英文映射字典
     en_name = {
         table_name_cols[k]['map']: table_name_cols[k]['en']
@@ -147,12 +163,20 @@ def industry_zh_a_spot_em() -> pd.DataFrame:
             'f15','f16','f17','f18','f20','f21','f22','f24','f25',
             'f38','f39','f104','f105','f106','f141', 'f136', 'f209','f222',
         ]
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
         # 执行类型转换
         temp_df[numeric_cols] = temp_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
 
         date_cols = ["f26"]
+<<<<<<< Updated upstream
         temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))         
+=======
+        temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))
+>>>>>>> Stashed changes
         temp_df.rename(columns=en_name, inplace=True) # 将默认列名改为英文列名
 
         # 获取上证交易所日历
@@ -162,7 +186,11 @@ def industry_zh_a_spot_em() -> pd.DataFrame:
         temp_df.loc[:, "date_int"] = temp_df["date"].astype(str).str.replace('-', '')
 
         temp_df = temp_df.loc[temp_df['close'].apply(is_open)]
+<<<<<<< Updated upstream
         temp_df = temp_df.replace({np.nan: None}) 
+=======
+        temp_df = temp_df.replace({np.nan: None})
+>>>>>>> Stashed changes
 
         industry_data_df = pd.DataFrame()  # 显式创建独立副本
         industry_data_df.loc[:, "date"] = temp_df["date"]
@@ -175,6 +203,10 @@ def industry_zh_a_spot_em() -> pd.DataFrame:
         industry_data_df.loc[:, "high"] = temp_df["high"]
         industry_data_df.loc[:, "low"] = temp_df["low"]
         industry_data_df.loc[:, "volume"] = temp_df["volume"]
+<<<<<<< Updated upstream
+=======
+        industry_data_df.loc[:, "turnover"] = temp_df["turnover"]
+>>>>>>> Stashed changes
 
         # temp_df["date"] = pd.to_datetime("today").strftime("%Y-%m-%d")  # 添加日期字段
         print(f'行业实时行情数据主表{industry_data_df}')
@@ -190,7 +222,11 @@ def industry_zh_a_spot_em() -> pd.DataFrame:
                     data=industry_data_df,
                     batch_size=1000  # 根据实际情况调整
                 )
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 # 执行批量插入
                 execute_batch_sql(sql_batches)
                 print(f"[Success] 行业行情主表批量写入完成，数据量：{len(industry_data_df)}")
@@ -211,7 +247,11 @@ def industry_sql_batch_generator(table_name, data, batch_size=500):
     columns = ', '.join([f"`{col}`" for col in data.columns])
     unique_keys = ['date_int', 'name']
     update_clause = ', '.join(
+<<<<<<< Updated upstream
         [f"`{col}`=VALUES(`{col}`)" 
+=======
+        [f"`{col}`=VALUES(`{col}`)"
+>>>>>>> Stashed changes
          for col in data.columns if col not in unique_keys]
     )
 
@@ -234,11 +274,19 @@ def industry_sql_batch_generator(table_name, data, batch_size=500):
                     values.append(f"'{cleaned}'")
             value_rows.append(f"({', '.join(values)})")
 
+<<<<<<< Updated upstream
         sql = f"""INSERT INTO `{table_name}` ({columns}) 
                VALUES {','.join(value_rows)}
                ON DUPLICATE KEY UPDATE {update_clause};"""
         batches.append(sql)
     
+=======
+        sql = f"""INSERT INTO `{table_name}` ({columns})
+               VALUES {','.join(value_rows)}
+               ON DUPLICATE KEY UPDATE {update_clause};"""
+        batches.append(sql)
+
+>>>>>>> Stashed changes
     return batches
 
 
@@ -262,14 +310,22 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
         for k in table_name_cols
         if 'map' in table_name_cols[k] and table_name_cols[k]['map']
     )
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     # map生成中文映射字典
     cn_name = {
         table_name_cols[k]['map']: table_name_cols[k]['cn']
         for k in table_name_cols
         if 'map' in table_name_cols[k] and table_name_cols[k]['map']
     }
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     # map生成英文映射字典
     en_name = {
         table_name_cols[k]['map']: table_name_cols[k]['en']
@@ -305,12 +361,20 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
             'f37','f38','f39','f40','f41','f45','f46','f48','f49','f57','f61',
             'f112','f113','f114','f115'
         ]
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
         # 执行类型转换
         temp_df[numeric_cols] = temp_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
 
         date_cols = ["f26", "f221"]
+<<<<<<< Updated upstream
         temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))         
+=======
+        temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))
+>>>>>>> Stashed changes
         temp_df.rename(columns=en_name, inplace=True) # 将默认列名改为英文列名
 
         # 获取上证交易所日历
@@ -320,7 +384,11 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
         temp_df.loc[:, "date_int"] = temp_df["date"].astype(str).str.replace('-', '')
 
         temp_df = temp_df.loc[temp_df['new_price'].apply(is_open)]
+<<<<<<< Updated upstream
         temp_df = temp_df.replace({np.nan: None}) 
+=======
+        temp_df = temp_df.replace({np.nan: None})
+>>>>>>> Stashed changes
 
         stock_data_df = pd.DataFrame()  # 显式创建独立副本
         stock_data_df.loc[:, "date"] = temp_df["date"]
@@ -333,6 +401,11 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
         stock_data_df.loc[:, "high"] = temp_df["high_price"]
         stock_data_df.loc[:, "low"] = temp_df["low_price"]
         stock_data_df.loc[:, "volume"] = temp_df["volume"]
+<<<<<<< Updated upstream
+=======
+        stock_data_df.loc[:, "turnover"] = temp_df["turnoverrate"]
+        
+>>>>>>> Stashed changes
         # stock_data_df.loc[:, "amount"] = temp_df[""]
 
         print(f'实时行情数据主表{stock_data_df}')
@@ -348,7 +421,11 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
                     data=stock_data_df,
                     batch_size=1000  # 根据实际情况调整
                 )
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 # 执行批量插入
                 execute_batch_sql(sql_batches)
                 print(f"[Success] 股票行情主表批量写入完成，数据量：{len(stock_data_df)}")
@@ -446,7 +523,11 @@ def index_zh_a_spot_em() -> pd.DataFrame:
         for k in table_name_cols
         if 'map' in table_name_cols[k] and table_name_cols[k]['map']
     }
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     # map生成英文映射字典
     en_name = {
         table_name_cols[k]['map']: table_name_cols[k]['en']
@@ -483,9 +564,15 @@ def index_zh_a_spot_em() -> pd.DataFrame:
             'f37','f38','f39','f40','f41','f45','f46','f48','f49','f57','f61',
             'f112','f113','f114','f115'
         ]
+<<<<<<< Updated upstream
         
         valid_numeric_cols = [col for col in numeric_cols if col in temp_df.columns]
         
+=======
+
+        valid_numeric_cols = [col for col in numeric_cols if col in temp_df.columns]
+
+>>>>>>> Stashed changes
         if valid_numeric_cols:
             temp_df[valid_numeric_cols] = temp_df[valid_numeric_cols].apply(
                 pd.to_numeric, errors='coerce'
@@ -499,7 +586,11 @@ def index_zh_a_spot_em() -> pd.DataFrame:
         date_cols = ["f26", "f221"]
 
         valid_date_cols = [col for col in date_cols if col in temp_df.columns]
+<<<<<<< Updated upstream
         
+=======
+
+>>>>>>> Stashed changes
         if valid_date_cols:
             temp_df[valid_date_cols] = temp_df[valid_date_cols].apply(
                 lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce")
@@ -510,7 +601,11 @@ def index_zh_a_spot_em() -> pd.DataFrame:
 
         #################################################################
         # print(f'实时指数数据主表{temp_df}')
+<<<<<<< Updated upstream
         # temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))         
+=======
+        # temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))
+>>>>>>> Stashed changes
         temp_df.rename(columns=en_name, inplace=True) # 将默认列名改为英文列名
 
         # 获取上证交易所日历
@@ -522,7 +617,11 @@ def index_zh_a_spot_em() -> pd.DataFrame:
         temp_df.loc[:, "date_int"] = temp_df["date"].astype(str).str.replace('-', '')
 
         temp_df = temp_df.loc[temp_df['new_price'].apply(is_open)]
+<<<<<<< Updated upstream
         temp_df = temp_df.replace({np.nan: None}) 
+=======
+        temp_df = temp_df.replace({np.nan: None})
+>>>>>>> Stashed changes
 
         index_data_df = pd.DataFrame()  # 显式创建独立副本
         index_data_df.loc[:, "date"] = temp_df["date"]
@@ -550,7 +649,11 @@ def index_zh_a_spot_em() -> pd.DataFrame:
                     data=index_data_df,
                     batch_size=1000  # 根据实际情况调整
                 )
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 # 执行批量插入
                 execute_batch_sql(sql_batches)
                 print(f"[Success] 指数实时行情主表批量写入完成，数据量：{len(index_data_df)}")
@@ -638,23 +741,39 @@ def fetch_and_format_stock_info(sql):
     if not conn:
         print("数据库连接失败")
         return []
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     try:
         cursor = conn.cursor(dictionary=True)
         cursor.execute(sql)
         results = cursor.fetchall()
+<<<<<<< Updated upstream
         
+=======
+
+>>>>>>> Stashed changes
         # 格式化为 code.market_id
         formatted_results = [
             f"{row['code']}.{row['market_id']}"
             for row in results
             if 'code' in row and 'market_id' in row
         ]
+<<<<<<< Updated upstream
         
         # 打印结果（或根据需求保存到文件）
         print("\n".join(formatted_results))
         return formatted_results
         
+=======
+
+        # 打印结果（或根据需求保存到文件）
+        print("\n".join(formatted_results))
+        return formatted_results
+
+>>>>>>> Stashed changes
     except Error as e:
         print(f"查询失败: {e}")
         return []
@@ -785,7 +904,11 @@ def 同步表结构(conn, table_name, data_columns):
     """动态添加缺失字段，附带调试日志和错误处理"""
     try:
         cursor = conn.cursor(buffered=True)
+<<<<<<< Updated upstream
         
+=======
+
+>>>>>>> Stashed changes
         # 调试：打印基本信息
         # print(f"\n[DEBUG] 开始同步表结构：{table_name}")
         # print(f"[DEBUG] 数据列要求字段：{data_columns}")
@@ -804,17 +927,29 @@ def 同步表结构(conn, table_name, data_columns):
         for col in data_columns:
             try:
                 # print(f"\n[DEBUG] 正在检查字段：{col}")
+<<<<<<< Updated upstream
                 
+=======
+
+>>>>>>> Stashed changes
                 if col not in existing_columns:
                     if col in all_required_columns:
                         # 从配置获取字段类型
                         col_info = table_config['columns'][col]
                         sql_type = tbs._get_sql_type(col_info['type'])
+<<<<<<< Updated upstream
                         
                         # 执行添加字段
                         alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col}` {sql_type};"
                         print(f"[EXECUTE] 执行SQL：{alter_sql}")
                         
+=======
+
+                        # 执行添加字段
+                        alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col}` {sql_type};"
+                        print(f"[EXECUTE] 执行SQL：{alter_sql}")
+
+>>>>>>> Stashed changes
                         cursor.execute(alter_sql)
                         # print(f"[SUCCESS] 字段 {col} 添加成功")
                     else:
@@ -844,7 +979,11 @@ def sql语句生成器(table_name, data, batch_size=500):
         data.insert(0, 'code_int', data['code'].astype(int))
 
     # SQL模板（批量版本）
+<<<<<<< Updated upstream
     sql_template = """INSERT INTO `{table_name}` ({columns}) 
+=======
+    sql_template = """INSERT INTO `{table_name}` ({columns})
+>>>>>>> Stashed changes
         VALUES {values}
         ON DUPLICATE KEY UPDATE {update_clause};"""
 
@@ -852,7 +991,11 @@ def sql语句生成器(table_name, data, batch_size=500):
     columns = ', '.join([f"`{col}`" for col in data.columns])
     unique_keys = ['date_int', 'code_int']
     update_clause = ', '.join(
+<<<<<<< Updated upstream
         [f"`{col}`=VALUES(`{col}`)" 
+=======
+        [f"`{col}`=VALUES(`{col}`)"
+>>>>>>> Stashed changes
          for col in data.columns if col not in unique_keys]
     )
 
@@ -887,7 +1030,11 @@ def sql语句生成器(table_name, data, batch_size=500):
                 update_clause=update_clause
             )
         )
+<<<<<<< Updated upstream
     
+=======
+
+>>>>>>> Stashed changes
     return batches
 
 def sql_batch_generator(table_name, data, batch_size=500):
@@ -898,7 +1045,11 @@ def sql_batch_generator(table_name, data, batch_size=500):
     columns = ', '.join([f"`{col}`" for col in data.columns])
     unique_keys = ['date_int', 'code_int']
     update_clause = ', '.join(
+<<<<<<< Updated upstream
         [f"`{col}`=VALUES(`{col}`)" 
+=======
+        [f"`{col}`=VALUES(`{col}`)"
+>>>>>>> Stashed changes
          for col in data.columns if col not in unique_keys]
     )
 
@@ -921,11 +1072,19 @@ def sql_batch_generator(table_name, data, batch_size=500):
                     values.append(f"'{cleaned}'")
             value_rows.append(f"({', '.join(values)})")
 
+<<<<<<< Updated upstream
         sql = f"""INSERT INTO `{table_name}` ({columns}) 
                VALUES {','.join(value_rows)}
                ON DUPLICATE KEY UPDATE {update_clause};"""
         batches.append(sql)
     
+=======
+        sql = f"""INSERT INTO `{table_name}` ({columns})
+               VALUES {','.join(value_rows)}
+               ON DUPLICATE KEY UPDATE {update_clause};"""
+        batches.append(sql)
+
+>>>>>>> Stashed changes
     return batches
 
 
@@ -940,21 +1099,36 @@ def execute_batch_sql(sql_batches, max_retries=3):
             try:
                 conn = DBManager.get_new_connection()
                 cursor = conn.cursor()
+<<<<<<< Updated upstream
                 
                 # 执行单个批次
                 cursor.execute(batch)
                 
+=======
+
+                # 执行单个批次
+                cursor.execute(batch)
+
+>>>>>>> Stashed changes
                 # 显式消费结果集
                 while True:
                     if cursor.with_rows:
                         cursor.fetchall()
                     if not cursor.nextset():
                         break
+<<<<<<< Updated upstream
                 
                 conn.commit()
                 print(f"成功插入 {batch.count('VALUES')} 行数据")
                 break
                 
+=======
+
+                conn.commit()
+                print(f"成功插入 {batch.count('VALUES')} 行数据")
+                break
+
+>>>>>>> Stashed changes
             except Error as e:
                 attempt += 1
                 print(f"第{attempt}次重试失败: {e}")
@@ -977,7 +1151,11 @@ def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=500):
     try:
         cursor = connection.cursor(buffered=True)  # 使用缓冲游标
         statements = [s.strip() for s in sql.split(';') if s.strip()]
+<<<<<<< Updated upstream
         
+=======
+
+>>>>>>> Stashed changes
         for statement in statements:
             try:
                 # 执行当前语句
@@ -1027,6 +1205,11 @@ def main():
 
     market_sentiment_a.main()
 
+<<<<<<< Updated upstream
+=======
+    industry_data.main()
+
+>>>>>>> Stashed changes
     industry_sentiment_a.main()
 
     indicators_strategy_buy.main()
@@ -1038,4 +1221,8 @@ def main():
 
 # main函数入口
 if __name__ == '__main__':
+<<<<<<< Updated upstream
     main()
+=======
+    main()
+>>>>>>> Stashed changes
