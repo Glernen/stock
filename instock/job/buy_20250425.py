@@ -29,74 +29,139 @@ PUSHPLUS_TOPIC = "stock"  # 群组编码
 query_a = """
 WITH latest_date AS (
     SELECT 
-        MAX(date_int) AS latest_date_int
+        MAX(`date_int`) AS latest_date_int
     FROM 
-        stock_3day_indicators
-)
-SELECT 
-    date_int, 
-    code, 
-    name, 
-    strategy, 
-    close, 
-    turnover, 
-    jingliuru_cn, 
-    industry, 
-    industry_cci, 
-    industry_sentiment,
-    CAST(COUNT(*) OVER (PARTITION BY csi.industry) * 100.0 / COUNT(*) OVER () AS FLOAT) AS 入选股的行业占比
-FROM 
-    cn_stock_indicators_buy csi
-JOIN latest_date ON csi.date_int = latest_date.latest_date_int
-WHERE 
-    csi.rate_60 IS NULL 
-    -- AND csi.date_int = 20250409
-    AND csi.strategy = 'strategy_a' 
-    AND csi.industry_kdj = '上涨趋势' 
-    AND csi.code NOT LIKE '688%' 
-    AND csi.code NOT LIKE '8%' 
+        `stock_3day_indicators`
+),
+buy_all AS (
+    SELECT 
+        `date_int`, 
+        `code`, 
+        `name`, 
+        `strategy`, 
+        `close`, 
+        `turnover`, 
+        `jingliuru_cn`, 
+        `industry`, 
+        `industry_cci`, 
+        `industry_sentiment`,
+        CAST(COUNT(*) OVER (PARTITION BY csi.`industry`) * 100.0 / COUNT(*) OVER () AS FLOAT) AS `入选股的行业占比`
+    FROM 
+        `cn_stock_indicators_buy` csi
+    JOIN latest_date ON csi.`date_int` = latest_date.latest_date_int
+    WHERE 
+        csi.`rate_60` IS NULL 
+        -- AND csi.`date_int` = 20250409
+        AND csi.`strategy` = 'strategy_a' 
+        -- AND csi.`industry_kdj` = '上涨趋势' 
+        AND csi.`code` NOT LIKE '688%' 
+        AND csi.`code` NOT LIKE '8%' 
     AND (
-        (csi.up_sentiment > 1 AND csi.industry_kdjj < 60 AND csi.industry_sentiment = '行业震荡中性' AND csi.turnover > 1 AND csi.industry_cci != '方向不明')
-        OR (csi.up_sentiment <= 20 AND csi.industry_wr = '持续超买' AND csi.turnover < 20)
-    ) LIMIT 20;
+    -- 大盘强势上涨：大盘指标上涨，行业指标上涨，个股换手率小于20%的精筛股
+            (csi.`up_sentiment` > 10
+        AND csi.`up_sentiment` < 50
+        AND csi.`down_sentiment` = 0
+        AND csi.`industry_kdj` = '上涨趋势'
+        AND csi.`industry_kdjj` < 60
+        AND csi.`industry_sentiment` = '行业震荡中性'
+        AND csi.`turnover` > 1
+        AND csi.`industry_cci` != '方向不明')
+    -- 大盘强势上涨：大盘指标上涨，行业指标上涨
+    OR (csi.`up_sentiment` >= 50
+        AND csi.`down_sentiment` = 0
+        AND csi.`industry_kdj` = '上涨趋势'
+        AND csi.`industry_sentiment` = '行业强势看涨'
+        and csi.`turnover` > 0.5
+        AND csi.`industry_cci` != '方向不明' )
+    --     -- 大盘震荡期：大盘指标上涨（指数K值小于60为标准）小于2个指数盘，行业指标上涨，个股换手率小于20%的精筛股
+    OR (csi.`up_sentiment` <= 20
+        AND csi.`industry_kdj` = '上涨趋势'
+        AND csi.`industry_wr` = '持续超买'
+        AND csi.`turnover` < 20)
+    --     -- 大盘上涨初现：大盘指标上涨，行业指标未墙裂上涨且处于超卖区，个股换手率大于1%的精筛股
+    OR (csi.`up_sentiment` >= 30
+        AND csi.`down_sentiment` = 0
+        AND csi.`industry_kdj` = '下降趋势'
+        AND csi.`industry_kdjj` < 20
+        AND csi.`industry_sentiment` = '行业震荡中性'
+        AND csi.`turnover` > 1)
+        )
+)
+SELECT * 
+FROM buy_all 
+ORDER BY `入选股的行业占比` DESC  
+LIMIT 20;
+
 """
 
 # B 策略 SQL
 query_b = """
 WITH latest_date AS (
     SELECT 
-        MAX(date_int) AS latest_date_int
+        MAX(`date_int`) AS latest_date_int
     FROM 
-        stock_3day_indicators
-)
-SELECT 
-    date_int, 
-    code, 
-    name, 
-    strategy, 
-    close, 
-    turnover, 
-    jingliuru_cn, 
-    industry, 
-    industry_cci, 
-    industry_sentiment,
-    CAST(COUNT(*) OVER (PARTITION BY csi.industry) * 100.0 / COUNT(*) OVER () AS FLOAT) AS 入选股的行业占比
-FROM 
-    cn_stock_indicators_buy csi
-JOIN latest_date ON csi.date_int = latest_date.latest_date_int
-WHERE 
-    csi.rate_60 IS NULL 
-    -- AND csi.date_int = 20250409
-    AND csi.strategy = 'strategy_b' 
-    AND csi.industry_kdj = '上涨趋势' 
-    AND csi.code NOT LIKE '688%' 
-    AND csi.code NOT LIKE '8%' 
+        `stock_3day_indicators`
+),
+buy_all AS (
+    SELECT 
+        `date_int`, 
+        `code`, 
+        `name`, 
+        `strategy`, 
+        `close`, 
+        `turnover`, 
+        `jingliuru_cn`, 
+        `industry`, 
+        `industry_cci`, 
+        `industry_sentiment`,
+        CAST(COUNT(*) OVER (PARTITION BY csi.`industry`) * 100.0 / COUNT(*) OVER () AS FLOAT) AS `入选股的行业占比`
+    FROM 
+        `cn_stock_indicators_buy` csi
+    JOIN latest_date ON csi.`date_int` = latest_date.latest_date_int
+    WHERE 
+        csi.`rate_60` IS NULL 
+        -- AND csi.`date_int` = 20250409
+        AND csi.`strategy` = 'strategy_b' 
+        -- AND csi.`industry_kdj` = '上涨趋势' 
+        AND csi.`code` NOT LIKE '688%' 
+        AND csi.`code` NOT LIKE '8%' 
     AND (
-        (csi.up_sentiment > 1 AND csi.industry_kdjj < 60 AND csi.industry_sentiment = '行业震荡中性' AND csi.turnover > 1 AND csi.industry_cci != '方向不明')
-        OR (csi.up_sentiment <= 20 AND csi.industry_wr = '持续超买' AND csi.turnover < 20)
-    ) LIMIT 20;
-
+    -- 大盘强势上涨：大盘指标上涨，行业指标上涨，个股换手率小于20%的精筛股
+            (csi.`up_sentiment` > 10 
+        AND csi.`up_sentiment` < 50
+        AND csi.`down_sentiment` = 0
+        AND csi.`industry_kdj` = '上涨趋势'
+        AND csi.`industry_kdjj` < 60
+        AND csi.`industry_sentiment` = '行业震荡中性'
+        AND csi.`turnover` > 1
+        AND csi.`industry_cci` != '方向不明')
+    -- 大盘强势上涨：大盘指标上涨，行业指标上涨
+    OR (csi.`up_sentiment` >= 50
+        AND csi.`down_sentiment` = 0
+        AND csi.`industry_kdj` = '上涨趋势'
+        AND csi.`industry_sentiment` = '行业强势看涨'
+        and csi.`turnover` > 0.5
+        AND csi.`industry_cci` != '方向不明' )
+    --     -- 大盘震荡期：大盘指标上涨（指数K值小于60为标准）小于2个指数盘，行业指标上涨，个股换手率小于20%的精筛股
+    OR (csi.`up_sentiment` <= 20
+        AND csi.`industry_kdj` = '上涨趋势'
+        AND csi.`industry_wr` = '持续超买'
+        AND csi.`turnover` < 20)
+    --     -- 大盘上涨初现：大盘指标上涨，行业指标未墙裂上涨且处于超卖区，个股换手率大于1%的精筛股
+    OR (csi.`up_sentiment` >= 30
+        AND csi.`down_sentiment` = 0
+        AND csi.`industry_kdj` = '下降趋势'
+        AND csi.`industry_kdjj` < 20
+        AND csi.`industry_sentiment` = '行业震荡中性'
+        AND csi.`turnover` > 1)
+        )
+)
+SELECT * 
+FROM buy_all 
+ORDER BY `入选股的行业占比` DESC  
+LIMIT 20;
 """
+
 
 def main():
     # 配置日志记录
