@@ -25,7 +25,7 @@ from typing import Optional  # 新增导入
 from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
 from sqlalchemy.dialects.mysql import TINYINT
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 
@@ -1869,110 +1869,113 @@ def process_single_code(
 
 
 def main():
-    # 行业历史数据
-    fetch_all_industry_hist()
+    start_time = time.time()
+    try:
+        # 行业历史数据
+        fetch_all_industry_hist()
 
-    # 实时行业 OK
-    industry_zh_a_spot_em()
+        # 实时行业 OK
+        industry_zh_a_spot_em()
 
 
-    # 检查是否为首次运行（任一指标表无数据）
-    is_first_run = check_if_first_run()
+        # 检查是否为首次运行（任一指标表无数据）
+        is_first_run = check_if_first_run()
 
-    # 首次运行时动态同步表结构
-    if is_first_run:
-        # 定义每个类型的示例code_int
-        sample_codes = {
-            'industry': '通用设备'     # 假设name='通用设备'为有效股票
-        }
+        # 首次运行时动态同步表结构
+        if is_first_run:
+            # 定义每个类型的示例code_int
+            sample_codes = {
+                'industry': '通用设备'     # 假设name='通用设备'为有效股票
+            }
+            
+            for data_type in ['industry']:
+                table_name = "cn_industry_indicators"
+                name = sample_codes[data_type]
+
+                # create_table_if_not_exists(table_name)  # 确保只执行一次
+                
+                # 1. 获取足够的历史数据（至少34条）
+                # 获取历史数据（直接传递整数）
+                hist_data = get_hist_data(name, data_type, last_date=None)
+                if len(hist_data) < 34:
+                    print(f"错误：{data_type}示例数据不足34条（当前{len(hist_data)}条），无法同步结构！")
+                    sys.exit(1)
+                    
+                # 2. 计算指标，获取所有字段
+                indicators = calculate_indicators(hist_data)
+                if indicators.empty:
+                    print(f"错误：{data_type}指标计算失败！")
+                    sys.exit(1)
+                    
+                # 3. 动态同步表结构（基于实际字段）
+                sync_table_structure(table_name, indicators.columns)
+                
+            print("首次运行表结构同步完成")
+
+
+           
+
+        batch_size = 500
+        max_workers = 10
         
-        for data_type in ['industry']:
-            table_name = "cn_industry_indicators"
-            name = sample_codes[data_type]
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        # with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for data_type in ['industry']:
+                names = get_latest_codes(data_type)
+                print(f"开始处理 {data_type} 共 {len(names)} 个代码")
 
-            # create_table_if_not_exists(table_name)  # 确保只执行一次
-            
-            # 1. 获取足够的历史数据（至少34条）
-            # 获取历史数据（直接传递整数）
-            hist_data = get_hist_data(name, data_type, last_date=None)
-            if len(hist_data) < 34:
-                print(f"错误：{data_type}示例数据不足34条（当前{len(hist_data)}条），无法同步结构！")
-                sys.exit(1)
-                
-            # 2. 计算指标，获取所有字段
-            indicators = calculate_indicators(hist_data)
-            if indicators.empty:
-                print(f"错误：{data_type}指标计算失败！")
-                sys.exit(1)
-                
-            # 3. 动态同步表结构（基于实际字段）
-            sync_table_structure(table_name, indicators.columns)
-            
-        print("首次运行表结构同步完成")
+                for batch_idx in range(0, len(names), batch_size):
+                    batch_names = names[batch_idx:batch_idx + batch_size]
+                    print(f"处理批次 {batch_idx//batch_size+1}，代码数：{len(batch_names)}")
 
-
-       
-
-    batch_size = 200
-    max_workers = 6
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for data_type in ['industry']:
-            names = get_latest_codes(data_type)
-            print(f"开始处理 {data_type} 共 {len(names)} 个代码")
-
-            for batch_idx in range(0, len(names), batch_size):
-                batch_names = names[batch_idx:batch_idx + batch_size]
-                print(f"处理批次 {batch_idx//batch_size+1}，代码数：{len(batch_names)}")
-
-                # 1. 获取本批次历史数据
-                batch_data = get_hist_data_batch(batch_names, data_type)
-                if batch_data.empty:
-                    print(f"批次 {batch_idx//batch_size+1} 无数据，跳过")
-                    continue
-
-                # 2. 批量获取最后处理日期（关键修改点）
-                # 从本批数据中提取所有唯一代码
-                unique_codes_in_batch = batch_data['name'].unique().tolist()
-                last_dates_map = get_last_processed_dates_batch(
-                    INDICATOR_TABLES[data_type], 
-                    unique_codes_in_batch
-                )
-
-                # 3. 并行处理本批次代码
-                futures = []
-                for name in batch_names:
-                    # 从批次数据中提取单个代码数据
-                    code_data = batch_data[batch_data['name'] == name].copy()
-                    if code_data.empty:
+                    # 1. 获取本批次历史数据
+                    batch_data = get_hist_data_batch(batch_names, data_type)
+                    if batch_data.empty:
+                        print(f"批次 {batch_idx//batch_size+1} 无数据，跳过")
                         continue
-                    # 提交任务时传入预取的最后处理日期
-                    futures.append(executor.submit(
-                        process_single_code,
-                        name=name,
-                        data_type=data_type,
-                        code_data=code_data,
-                        last_processed_date=last_dates_map.get(name, None)
-                    ))
 
-                # 4. 合并并提交本批次结果
-                valid_dfs = []
-                for future in as_completed(futures):
-                    df = future.result()
-                    if df is not None and not df.empty:
-                        valid_dfs.append(df)
-                
-                if valid_dfs:
-                    combined_data = pd.concat(valid_dfs, ignore_index=True)
-                    sync_and_save(INDICATOR_TABLES[data_type], combined_data)
-                    print(f"批次提交成功，记录数：{len(combined_data)}")
-                else:
-                    print(f"本批次无有效数据")
+                    # 2. 批量获取最后处理日期（关键修改点）
+                    # 从本批数据中提取所有唯一代码
+                    unique_codes_in_batch = batch_data['name'].unique().tolist()
+                    last_dates_map = get_last_processed_dates_batch(
+                        INDICATOR_TABLES[data_type], 
+                        unique_codes_in_batch
+                    )
+
+                    # 3. 并行处理本批次代码
+                    futures = []
+                    for name in batch_names:
+                        # 从批次数据中提取单个代码数据
+                        code_data = batch_data[batch_data['name'] == name].copy()
+                        if code_data.empty:
+                            continue
+                        # 提交任务时传入预取的最后处理日期
+                        futures.append(executor.submit(
+                            process_single_code,
+                            name=name,
+                            data_type=data_type,
+                            code_data=code_data,
+                            last_processed_date=last_dates_map.get(name, None)
+                        ))
+
+                    # 4. 合并并提交本批次结果
+                    valid_dfs = []
+                    for future in as_completed(futures):
+                        df = future.result()
+                        if df is not None and not df.empty:
+                            valid_dfs.append(df)
+                    
+                    if valid_dfs:
+                        combined_data = pd.concat(valid_dfs, ignore_index=True)
+                        sync_and_save(INDICATOR_TABLES[data_type], combined_data)
+                        print(f"批次提交成功，记录数：{len(combined_data)}")
+                    else:
+                        print(f"本批次无有效数据")
 
 
-    process_3day_data()
-
-
+        process_3day_data()
+    finally:
+        print(f"\n🕒 总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
 # main函数入口
 if __name__ == '__main__':
     main()

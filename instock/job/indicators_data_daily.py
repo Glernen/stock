@@ -16,13 +16,14 @@ import datetime
 import threading
 from typing import Optional  # 新增导入
 # from datetime import datetime, timedelta
-from concurrent.futures import ThreadPoolExecutor, as_completed 
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from typing import Dict, List, Tuple
 from mysql.connector import Error
 # from instock.lib.database import DBManager
 import sqlalchemy
+import time
 import instock.core.tablestructure as tbs
-from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
+from instock.lib.database import db_host, db_user, db_password, db_database, db_charset
 
 
 
@@ -52,7 +53,7 @@ def calculate_indicators(data):
     计算ETF数据的各种指标。
 
     参数:
-    data (pd.DataFrame): 包含ETF每日数据的DataFrame，至少包含'close', 'high', 'low', 'volume'列 收盘价，最高价，最低价，成交量
+    data (pd.DataFrame): 包含ETF每日数据的DataFrame，至少包含'open' ,'close', 'high', 'low', 'volume'列 收盘价，最高价，最低价，成交量
 
     返回:
     pd.DataFrame: 包含计算后指标数据的DataFrame
@@ -64,8 +65,8 @@ def calculate_indicators(data):
 
     # 计算KDJ的K和D
     daily_data_indicators['kdjk'], daily_data_indicators['kdjd'] = tl.STOCH(
-        data['high'], 
-        data['low'], 
+        data['high'],
+        data['low'],
         data['close'],
         fastk_period=9,    # 默认参数需显式指定
         slowk_period=5,
@@ -79,7 +80,7 @@ def calculate_indicators(data):
 
     # 计算BOLL
     daily_data_indicators['boll_ub'], daily_data_indicators['boll'], daily_data_indicators['boll_lb'] = tl.BBANDS(data['close'])
-    
+
     # 计算W&R
     daily_data_indicators['wr_6'] = tl.WILLR(data['high'], data['low'], data['close'], timeperiod=6)
     daily_data_indicators['wr_10'] = tl.WILLR(data['high'], data['low'], data['close'], timeperiod=10)
@@ -233,9 +234,9 @@ def calculate_indicators(data):
 
     daily_data_indicators['rvi'] = (rvi_x.rolling(10).mean() / rvi_y.rolling(10).mean()).fillna(0)
     daily_data_indicators['rvis'] = (
-        daily_data_indicators['rvi'] + 
-        2 * daily_data_indicators['rvi'].shift(1) + 
-        2 * daily_data_indicators['rvi'].shift(2) + 
+        daily_data_indicators['rvi'] +
+        2 * daily_data_indicators['rvi'].shift(1) +
+        2 * daily_data_indicators['rvi'].shift(2) +
         daily_data_indicators['rvi'].shift(3)
     ) / 6
 
@@ -287,7 +288,7 @@ INDICATOR_TABLES = {
 }
 
 # 数据库连接配置
-MAX_HISTORY_WINDOW = 300  # 指标计算所需最大历史窗口
+MAX_HISTORY_WINDOW = 200  # 指标计算所需最大历史窗口
 
 
 def get_latest_codes(data_type: str) -> List[str]:
@@ -295,7 +296,7 @@ def get_latest_codes(data_type: str) -> List[str]:
     try:
         with DBManager.get_new_connection() as conn:
             query = f"""
-                SELECT code_int 
+                SELECT code_int
                 FROM {TABLE_MAP[data_type]['info_table']}
                 WHERE date = (SELECT MAX(date) FROM {TABLE_MAP[data_type]['info_table']})
             """
@@ -310,14 +311,14 @@ def get_hist_data(code: int, data_type: str, last_date: str = None) -> pd.DataFr
         with DBManager.get_new_connection() as conn:
             base_query = f"""
                 SELECT * FROM {TABLE_MAP[data_type]['hist_table']}
-                WHERE code_int = '{code}' 
+                WHERE code_int = '{code}'
             """
-            
+
             if last_date:
                 query = f"""
                     {base_query}
                     AND date >= (
-                        SELECT DATE_SUB('{last_date}', INTERVAL {MAX_HISTORY_WINDOW} DAY) 
+                        SELECT DATE_SUB('{last_date}', INTERVAL {MAX_HISTORY_WINDOW} DAY)
                         FROM DUAL
                     )
                 """
@@ -331,7 +332,7 @@ def get_hist_data(code: int, data_type: str, last_date: str = None) -> pd.DataFr
             # print("时间范围:", data['date'].min(), "至", data['date'].max())
             # print("缺失值统计:")
             # print(data[['close', 'high', 'low', 'volume']].isnull().sum())
-            
+
             return data.sort_values('date', ascending=True) if not data.empty else pd.DataFrame()
             # return data.sort_values('date', ascending=True)
     except Exception as e:
@@ -344,10 +345,10 @@ def calculate_and_save(code: str, data_type: str):
         # 检查目标表是否存在
         table_name = INDICATOR_TABLES[data_type]
         # create_table_if_not_exists(table_name)
-        
+
         # 获取最新处理日期
         last_processed_date = get_last_processed_date(table_name, code)
-        
+
         # 获取历史数据（增量逻辑）
         hist_data = get_hist_data(code, data_type, last_processed_date)
         if hist_data.empty:
@@ -355,7 +356,7 @@ def calculate_and_save(code: str, data_type: str):
             return
 
         # 检查必需字段是否存在
-        required_columns = {'date', 'code', 'close', 'high', 'low', 'volume'}
+        required_columns = {'date', 'code','open', 'close', 'high', 'low', 'volume'}
         missing_columns = required_columns - set(hist_data.columns)
         if missing_columns:
             print(f"数据缺失关键列 {missing_columns}，跳过处理：{code}")
@@ -364,11 +365,11 @@ def calculate_and_save(code: str, data_type: str):
         # 计算指标
         # print(f"\n=== 开始处理 {code} ===")
         indicators = calculate_indicators(hist_data)
-        
+
         # --- 调试5: 输出前5行数据样本 ---
         # print(f"[DEBUG] {code} 计算结果样本:")
         # print(indicators.head())
-        
+
         # --- 调试6: 检查是否存在负无穷或零值 ---
         # print(f"[DEBUG] {code} 异常值统计:")
         # print("Inf values:", (indicators == np.inf).sum().sum())
@@ -378,7 +379,7 @@ def calculate_and_save(code: str, data_type: str):
         # 过滤已存在数据
         if last_processed_date:
             indicators = indicators[indicators['date'] > last_processed_date]
-        
+
         # 写入数据库前检查数据是否为空
         if not indicators.empty:
             # 新增过滤条件：删除 cci_84 为0的行
@@ -397,7 +398,7 @@ def get_latest_codes(data_type: str) -> List[int]:
     try:
         with DBManager.get_new_connection() as conn:
             query = f"""
-                SELECT code_int 
+                SELECT code_int
                 FROM {TABLE_MAP[data_type]['info_table']}
                 WHERE date = (SELECT MAX(date) FROM {TABLE_MAP[data_type]['info_table']})
             """
@@ -412,8 +413,8 @@ def get_last_processed_date(table: str, code: int) -> str:
     try:
         with DBManager.get_new_connection() as conn:
             query = f"""
-                SELECT MAX(date) AS last_date 
-                FROM {table} 
+                SELECT MAX(date) AS last_date
+                FROM {table}
                 WHERE code_int = '{code}'
             """
             result = pd.read_sql(query, conn)
@@ -431,8 +432,8 @@ def get_last_processed_dates_batch(table: str, codes: List[int]) -> Dict[int, st
         with DBManager.get_new_connection() as conn:
             code_list = ",".join(map(str, codes))
             query = f"""
-                SELECT code_int, MAX(date) AS last_date 
-                FROM {table} 
+                SELECT code_int, MAX(date) AS last_date
+                FROM {table}
                 WHERE code_int IN ({code_list})
                 GROUP BY code_int
             """
@@ -452,7 +453,7 @@ def sync_and_save(table_name: str, data: pd.DataFrame):
     #     finally:
     #         if conn.is_connected():
     #             conn.close()
-                
+
     sql_txt = sql语句生成器(table_name, data)
     execute_raw_sql(sql_txt)
 
@@ -578,23 +579,23 @@ def 同步表结构(conn, table_name, data_columns):
     """动态添加缺失字段（线程安全+事务锁）"""
     try:
         cursor = conn.cursor(buffered=True)
-        
+
         # 1. 获取表级写锁
         cursor.execute(f"LOCK TABLES `{table_name}` WRITE;")
-        
+
         # 2. 使用 INFORMATION_SCHEMA 检查字段
         cursor.execute(f"""
-            SELECT COLUMN_NAME 
-            FROM INFORMATION_SCHEMA.COLUMNS 
-            WHERE TABLE_NAME = '{table_name}' 
+            SELECT COLUMN_NAME
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_NAME = '{table_name}'
               AND TABLE_SCHEMA = DATABASE()
         """)
         existing_columns = {row[0] for row in cursor.fetchall()}
-        
+
         # 3. 获取配置表字段
         table_config = tbs.TABLE_REGISTRY.get(table_name, {})
         all_required_columns = set(table_config.get('columns', {}).keys())
-        
+
         # 4. 遍历处理字段
         for col in data_columns:
             try:
@@ -618,12 +619,12 @@ def 同步表结构(conn, table_name, data_columns):
             except Exception as e:
                 print(f"[ERROR] 处理字段 {col} 失败：{str(e)}")
                 conn.rollback()
-                
+
         # 5. 释放锁
         cursor.execute("UNLOCK TABLES;")
         conn.commit()
         print(f"[SUCCESS] 表 {table_name} 结构同步完成")
-        
+
     except Exception as main_error:
         print(f"[CRITICAL] 同步表结构主流程失败：{str(main_error)}")
         conn.rollback()
@@ -639,8 +640,8 @@ def sql语句生成器(table_name, data):
     # columns = ', '.join([f"`{col}`" for col in data.columns])
     # update_clause = ', '.join([f"`{col}`=VALUES(`{col}`)" for col in data.columns if col not in ['date', 'code']])
     # 准备模板
-    # 
-    # 
+    #
+    #
     # 检查输入数据是否为空
     if data.empty:
         print("[WARNING] 输入数据为空，跳过SQL生成")
@@ -650,15 +651,15 @@ def sql语句生成器(table_name, data):
     if 'code' in data.columns and 'code_int' not in data.columns:
         data.insert(0, 'code_int', data['code'].astype(int))
 
-    sql_template = """INSERT INTO `{table_name}` ({columns}) 
-        VALUES {values} 
+    sql_template = """INSERT INTO `{table_name}` ({columns})
+        VALUES {values}
         ON DUPLICATE KEY UPDATE {update_clause};"""
 
     # 预处理列名
     columns = ', '.join([f"`{col}`" for col in data.columns])
 
     # 指定唯一键列（这些字段用于比对数据库中的记录）
-    unique_keys = ['date', 'code'] 
+    unique_keys = ['date', 'code']
 
     # 更新子句：更新所有非唯一键的列
     update_clause = ', '.join(
@@ -704,7 +705,7 @@ def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=5000)
     if not sql.strip():
         print("[WARNING] SQL语句为空，跳过执行")
         return False
-    
+
     connection = DBManager.get_new_connection()
     if not connection:
         return False
@@ -714,7 +715,7 @@ def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=5000)
         if not statements:
             print("[WARNING] 无有效SQL语句")
             return False
-        
+
         for statement in statements:
             cursor.execute(statement)
         connection.commit()
@@ -766,7 +767,7 @@ def sync_table_structure(table_name: str, data_columns: List[str]):
     try:
         with DBManager.get_new_connection() as conn:
             cursor = conn.cursor()
-            
+
             # 1. 创建表（如果不存在）
             cursor.execute(f"SHOW TABLES LIKE '{table_name}'")
             if not cursor.fetchone():
@@ -783,16 +784,16 @@ def sync_table_structure(table_name: str, data_columns: List[str]):
                 """
                 cursor.execute(create_sql)
                 print(f"创建基础表 {table_name}")
-            
+
             # 2. 动态添加指标字段
             cursor.execute(f"""
-                SELECT COLUMN_NAME 
-                FROM INFORMATION_SCHEMA.COLUMNS 
-                WHERE TABLE_NAME = '{table_name}' 
+                SELECT COLUMN_NAME
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = '{table_name}'
                   AND TABLE_SCHEMA = DATABASE()
             """)
             existing_columns = {row[0] for row in cursor.fetchall()}
-            
+
             # 3. 遍历指标字段，添加缺失列
             for col in data_columns:
                 if col not in existing_columns and col not in ['id', 'date','date_int', 'code_int', 'code', 'name']:
@@ -805,8 +806,9 @@ def sync_table_structure(table_name: str, data_columns: List[str]):
         print(f"同步表 {table_name} 结构失败：{str(e)}")
         sys.exit(1)
 
+
 def get_hist_data_batch(batch_codes: List[int], data_type: str) -> pd.DataFrame:
-    """严格按批次执行单次查询（无分块）"""
+    """严格按批次执行单次查询（无分块），获取最近MAX_HISTORY_WINDOW天数据"""
     if not batch_codes:
         return pd.DataFrame()
 
@@ -814,16 +816,40 @@ def get_hist_data_batch(batch_codes: List[int], data_type: str) -> pd.DataFrame:
         with DBManager.get_new_connection() as conn:
             code_list = ",".join(map(str, batch_codes))
             
+            # 计算日期范围
+            date_condition = f"date >= CURDATE() - INTERVAL {MAX_HISTORY_WINDOW} DAY"
+            
             query = f"""
-                SELECT * 
+                SELECT date, date_int, code, code_int, name, open, close, high, low, volume
                 FROM {TABLE_MAP[data_type]['hist_table']}
                 WHERE code_int IN ({code_list})
-                ORDER BY code_int, date DESC
+                  AND {date_condition}
+                ORDER BY code_int, date_int ASC 
             """
             return pd.read_sql(query, conn)
     except Exception as e:
         print(f"获取批次数据失败：{str(e)}")
         return pd.DataFrame()
+
+# def get_hist_data_batch(batch_codes: List[int], data_type: str) -> pd.DataFrame:
+#     """严格按批次执行单次查询（无分块）"""
+#     if not batch_codes:
+#         return pd.DataFrame()
+
+#     try:
+#         with DBManager.get_new_connection() as conn:
+#             code_list = ",".join(map(str, batch_codes))
+
+#             query = f"""
+#                 SELECT *
+#                 FROM {TABLE_MAP[data_type]['hist_table']}
+#                 WHERE code_int IN ({code_list})
+#                 -- ORDER BY code_int, date DESC
+#             """
+#             return pd.read_sql(query, conn)
+#     except Exception as e:
+#         print(f"获取批次数据失败：{str(e)}")
+#         return pd.DataFrame()
 
 
 def calculate_and_save_batch(code: int, data_type: str, batch_data: pd.DataFrame) -> pd.DataFrame:
@@ -838,9 +864,9 @@ def calculate_and_save_batch(code: int, data_type: str, batch_data: pd.DataFrame
         # 后续处理逻辑
         table_name = INDICATOR_TABLES[data_type]
         last_processed_date = get_last_processed_date(table_name, code)
-        
+
         # 检查必需字段
-        required_columns = {'date', 'code', 'close', 'high', 'low', 'volume'}
+        required_columns = {'date', 'code', 'open', 'close', 'high', 'low', 'volume'}
         missing_columns = required_columns - set(hist_data.columns)
         if missing_columns:
             print(f"数据缺失关键列 {missing_columns}，跳过处理：{code}")
@@ -850,23 +876,23 @@ def calculate_and_save_batch(code: int, data_type: str, batch_data: pd.DataFrame
         indicators = calculate_indicators(hist_data)
         if indicators.empty:
             return pd.DataFrame()
-        
+
         # 过滤已处理日期
         if last_processed_date:
             indicators = indicators[indicators['date'] > last_processed_date]
-        
+
         # 过滤无效cci_84
         if 'cci_84' in indicators.columns:
             indicators = indicators[indicators['cci_84'] != 0]
-        
+
         return indicators if not indicators.empty else pd.DataFrame()
     except Exception as e:
         print(f"处理{data_type} {code}失败：{str(e)}")
         return pd.DataFrame()
 
-def process_single_code(    
-    code: int, 
-    data_type: str, 
+def process_single_code(
+    code: int,
+    data_type: str,
     code_data: pd.DataFrame,
     last_processed_date: Optional[str] = None
 ) -> pd.DataFrame:
@@ -899,100 +925,105 @@ def process_single_code(
 
 
 def main():
-    # 检查是否为首次运行（任一指标表无数据）
-    is_first_run = check_if_first_run()
+    start_time = time.time()
+    try:
+        # 检查是否为首次运行（任一指标表无数据）
+        is_first_run = check_if_first_run()
 
-    # 首次运行时动态同步表结构
-    if is_first_run:
-        # 定义每个类型的示例code_int
-        sample_codes = {
-            'stock': 1,      # 假设code_int=1为有效股票
-            'etf': 159001,   # 假设code_int=159001为有效ETF
-            'index': 1       # 假设code_int=1为有效指数
-        }
-        
-        for data_type in ['stock', 'etf', 'index']:
-            table_name = INDICATOR_TABLES[data_type]
-            code_int = sample_codes[data_type]
+        # 首次运行时动态同步表结构
+        if is_first_run:
+            # 定义每个类型的示例code_int
+            sample_codes = {
+                'stock': 1,      # 假设code_int=1为有效股票
+                'etf': 159001,   # 假设code_int=159001为有效ETF
+                'index': 1       # 假设code_int=1为有效指数
+            }
 
-            # create_table_if_not_exists(table_name)  # 确保只执行一次
-            
-            # 1. 获取足够的历史数据（至少34条）
-            # 获取历史数据（直接传递整数）
-            hist_data = get_hist_data(code_int, data_type, last_date=None)
-            if len(hist_data) < 34:
-                print(f"错误：{data_type}示例数据不足34条（当前{len(hist_data)}条），无法同步结构！")
-                sys.exit(1)
-                
-            # 2. 计算指标，获取所有字段
-            indicators = calculate_indicators(hist_data)
-            if indicators.empty:
-                print(f"错误：{data_type}指标计算失败！")
-                sys.exit(1)
-                
-            # 3. 动态同步表结构（基于实际字段）
-            sync_table_structure(table_name, indicators.columns)
-            
-        print("首次运行表结构同步完成")
+            for data_type in ['stock', 'etf', 'index']:
+                table_name = INDICATOR_TABLES[data_type]
+                code_int = sample_codes[data_type]
+
+                # create_table_if_not_exists(table_name)  # 确保只执行一次
+
+                # 1. 获取足够的历史数据（至少34条）
+                # 获取历史数据（直接传递整数）
+                hist_data = get_hist_data(code_int, data_type, last_date=None)
+                if len(hist_data) < 34:
+                    print(f"错误：{data_type}示例数据不足34条（当前{len(hist_data)}条），无法同步结构！")
+                    sys.exit(1)
+
+                # 2. 计算指标，获取所有字段
+                indicators = calculate_indicators(hist_data)
+                if indicators.empty:
+                    print(f"错误：{data_type}指标计算失败！")
+                    sys.exit(1)
+
+                # 3. 动态同步表结构（基于实际字段）
+                sync_table_structure(table_name, indicators.columns)
+
+            print("首次运行表结构同步完成")
 
 
-       
 
-    batch_size = 200
-    max_workers = 6
-    
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        for data_type in ['etf', 'index', 'stock']:
-            codes = get_latest_codes(data_type)
-            print(f"开始处理 {data_type} 共 {len(codes)} 个代码")
 
-            for batch_idx in range(0, len(codes), batch_size):
-                batch_codes = codes[batch_idx:batch_idx + batch_size]
-                print(f"处理批次 {batch_idx//batch_size+1}，代码数：{len(batch_codes)}")
+        batch_size = 500
+        max_workers = 10
 
-                # 1. 获取本批次历史数据
-                batch_data = get_hist_data_batch(batch_codes, data_type)
-                if batch_data.empty:
-                    print(f"批次 {batch_idx//batch_size+1} 无数据，跳过")
-                    continue
+        with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        # with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            for data_type in ['etf', 'index', 'stock']:
+                codes = get_latest_codes(data_type)
+                print(f"开始处理 {data_type} 共 {len(codes)} 个代码")
 
-                # 2. 批量获取最后处理日期（关键修改点）
-                # 从本批数据中提取所有唯一代码
-                unique_codes_in_batch = batch_data['code_int'].unique().tolist()
-                last_dates_map = get_last_processed_dates_batch(
-                    INDICATOR_TABLES[data_type], 
-                    unique_codes_in_batch
-                )
+                for batch_idx in range(0, len(codes), batch_size):
+                    batch_codes = codes[batch_idx:batch_idx + batch_size]
+                    print(f"处理批次 {batch_idx//batch_size+1}，代码数：{len(batch_codes)}")
 
-                # 3. 并行处理本批次代码
-                futures = []
-                for code in batch_codes:
-                    # 从批次数据中提取单个代码数据
-                    code_data = batch_data[batch_data['code_int'] == code].copy()
-                    if code_data.empty:
+                    # 1. 获取本批次历史数据
+                    batch_data = get_hist_data_batch(batch_codes, data_type)
+                    if batch_data.empty:
+                        print(f"批次 {batch_idx//batch_size+1} 无数据，跳过")
                         continue
-                    # 提交任务时传入预取的最后处理日期
-                    futures.append(executor.submit(
-                        process_single_code,
-                        code=code,
-                        data_type=data_type,
-                        code_data=code_data,
-                        last_processed_date=last_dates_map.get(code, None)
-                    ))
 
-                # 4. 合并并提交本批次结果
-                valid_dfs = []
-                for future in as_completed(futures):
-                    df = future.result()
-                    if df is not None and not df.empty:
-                        valid_dfs.append(df)
-                
-                if valid_dfs:
-                    combined_data = pd.concat(valid_dfs, ignore_index=True)
-                    sync_and_save(INDICATOR_TABLES[data_type], combined_data)
-                    print(f"批次提交成功，记录数：{len(combined_data)}")
-                else:
-                    print(f"本批次无有效数据")
+                    # 2. 批量获取最后处理日期（关键修改点）
+                    # 从本批数据中提取所有唯一代码
+                    unique_codes_in_batch = batch_data['code_int'].unique().tolist()
+                    last_dates_map = get_last_processed_dates_batch(
+                        INDICATOR_TABLES[data_type],
+                        unique_codes_in_batch
+                    )
+
+                    # 3. 并行处理本批次代码
+                    futures = []
+                    for code in batch_codes:
+                        # 从批次数据中提取单个代码数据
+                        code_data = batch_data[batch_data['code_int'] == code].copy()
+                        if code_data.empty:
+                            continue
+                        # 提交任务时传入预取的最后处理日期
+                        futures.append(executor.submit(
+                            process_single_code,
+                            code=code,
+                            data_type=data_type,
+                            code_data=code_data,
+                            last_processed_date=last_dates_map.get(code, None)
+                        ))
+
+                    # 4. 合并并提交本批次结果
+                    valid_dfs = []
+                    for future in as_completed(futures):
+                        df = future.result()
+                        if df is not None and not df.empty:
+                            valid_dfs.append(df)
+
+                    if valid_dfs:
+                        combined_data = pd.concat(valid_dfs, ignore_index=True)
+                        sync_and_save(INDICATOR_TABLES[data_type], combined_data)
+                        print(f"批次提交成功，记录数：{len(combined_data)}")
+                    else:
+                        print(f"本批次无有效数据")
+    finally:
+        print(f"\n🕒 总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
 
 if __name__ == "__main__":
     main()
