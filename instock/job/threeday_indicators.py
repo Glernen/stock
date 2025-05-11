@@ -23,7 +23,7 @@ import pytz
 from mysql.connector import Error
 from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 
@@ -252,7 +252,7 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
     # 第二步：执行分析查询
     query = f"""
     WITH LatestDate AS (
-        SELECT MAX(date_int) AS last_date 
+        SELECT MAX(date) AS last_date
         FROM {source_table}
         WHERE code_int = {sample_code}
     ),
@@ -292,7 +292,10 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
             hist.turnover
         FROM {source_table} t
         {join_clause}
-        WHERE t.date_int BETWEEN (SELECT last_date - 20 FROM LatestDate) AND (SELECT last_date FROM LatestDate)
+        WHERE t.date BETWEEN
+          (SELECT DATE_SUB(last_date, INTERVAL 10 DAY) FROM LatestDate) -- ✅ 起始日期 = last_date - 20天
+          AND
+          (SELECT last_date FROM LatestDate) -- ✅ 结束日期 = last_date
     )
     SELECT * FROM 3day
     WHERE kdjk_day2 IS NOT NULL
@@ -370,34 +373,37 @@ def create_3day_table(table_name: str):
 
 
 def main():
-    # 并行处理三类数据
-    with ThreadPoolExecutor(max_workers=3) as executor:
-        # 股票三日指标
-        executor.submit(process_3day_data, 
-                       'cn_stock_indicators', 
-                       'stock_3day_indicators',
-                       1)  # 示例代码000001
-        
-        # ETF三日指标
-        executor.submit(process_3day_data,
-                       'cn_etf_indicators',
-                       'etf_3day_indicators',
-                       159001)  # 示例代码159001
-        
-        # 指数三日指标
-        executor.submit(process_3day_data,
-                       'cn_index_indicators',
-                       'index_3day_indicators',
-                       1)  # 示例代码000001
-
-if __name__ == "__main__":
     # 时区设置
     tz = pytz.timezone('Asia/Shanghai')
     pd.Timestamp.now(tz).strftime('%Y-%m-%d %H:%M:%S %Z%z')
-    
     start_time = time.time()
+    try:
+        # 并行处理三类数据
+        with ProcessPoolExecutor(max_workers=3) as executor:
+            # 股票三日指标
+            executor.submit(process_3day_data, 
+                           'cn_stock_indicators', 
+                           'stock_3day_indicators',
+                           1)  # 示例代码000001
+            
+            # ETF三日指标
+            executor.submit(process_3day_data,
+                           'cn_etf_indicators',
+                           'etf_3day_indicators',
+                           159001)  # 示例代码159001
+            
+            # 指数三日指标
+            executor.submit(process_3day_data,
+                           'cn_index_indicators',
+                           'index_3day_indicators',
+                           1)  # 示例代码000001
+        
+    finally:
+        print(f"\n🕒 三日指标，总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
+
+if __name__ == "__main__":
     main()
-    print(f"总耗时：{time.time()-start_time:.2f}秒")
+
 
 
 # /*股票三日指标数据分析,储到stock_3day_indicators,*/

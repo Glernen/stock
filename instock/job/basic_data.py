@@ -22,7 +22,7 @@ import pandas_market_calendars as mcal
 from mysql.connector import Error
 from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 
