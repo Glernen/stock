@@ -263,7 +263,7 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
             t.code,
             t.date,
             t.name,
-            t.close,
+            hist.close,
             t.kdjk,
             LAG(t.kdjk, 1) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS kdjk_day1,
             LAG(t.kdjk, 2) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS kdjk_day2,

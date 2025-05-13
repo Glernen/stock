@@ -378,7 +378,7 @@ def calculate_and_save(code: str, data_type: str):
 
         # 过滤已存在数据
         if last_processed_date:
-            indicators = indicators[indicators['date'] > last_processed_date]
+            indicators = indicators[indicators['date'] >= last_processed_date]
 
         # 写入数据库前检查数据是否为空
         if not indicators.empty:
@@ -879,7 +879,7 @@ def calculate_and_save_batch(code: int, data_type: str, batch_data: pd.DataFrame
 
         # 过滤已处理日期
         if last_processed_date:
-            indicators = indicators[indicators['date'] > last_processed_date]
+            indicators = indicators[indicators['date'] >= last_processed_date]
 
         # 过滤无效cci_84
         if 'cci_84' in indicators.columns:
@@ -911,7 +911,7 @@ def process_single_code(
         # 过滤已处理日期
         # 使用预取的last_processed_date过滤数据
         if last_processed_date:
-            indicators = indicators[indicators['date'] > last_processed_date]
+            indicators = indicators[indicators['date'] >= last_processed_date]
 
 
         # 过滤无效cci_84

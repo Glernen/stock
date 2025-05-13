@@ -24,14 +24,14 @@ import basic_data_other_daily_job as hdtj
 import basic_data_after_close_daily_job as acdj
 import indicators_data_daily_job as gdj
 import strategy_data_daily_job as sdj
-import backtest_data_daily_job as bdj
+import backtest_data_daily_job as backtest_data_daily_job
 import klinepattern_data_daily_job as kdj
 import selection_data_daily_job as sddj
 import basic_data as basic_data
 import basic_hist_data as basic_hist_data
 import indicators_data_daily as indicators_data_daily
 import threeday_indicators  as threeday_indicators
-import indicators_buy as indicators_buy
+import indicators_strategy_buy as indicators_strategy_buy
 import market_sentiment_a as market_sentiment_a
 import industry_data as industry_data
 import industry_sentiment_a as industry_sentiment_a
@@ -74,7 +74,7 @@ def main():
     industry_sentiment_a.main()
     
     # 买入策略
-    indicators_buy.main()
+    indicators_strategy_buy.main()
 
     # etf 买入策略
     strategy_etf_buy.main()
@@ -98,7 +98,7 @@ def main():
         # executor.submit(sdj.main)
 
     # # # # 第6步创建股票回测
-    bdj.main()
+    backtest_data_daily_job.main()
 
     # # # # 第7步创建股票闭盘后才有的数据
     acdj.main()
