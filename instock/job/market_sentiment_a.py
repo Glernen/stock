@@ -12,7 +12,8 @@ import argparse
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
-from sqlalchemy import text
+import sqlalchemy
+from sqlalchemy import MetaData, Table, text
 from tqdm import tqdm
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 import instock.lib.database as mdb
@@ -21,178 +22,6 @@ import instock.core.tablestructure as tbs
 __author__ = 'hqm'
 __date__ = '2025年4月20日'
 
-'''
-主要逻辑：访问数据库，将获取的数据保存到market_sentiment_a数据表中
-1、sql获取数据：
-sql：WITH date_range AS (
-    SELECT DISTINCT date_int
-    FROM index_3day_indicators
-    WHERE STR_TO_DATE(date_int, '%Y%m%d') >= DATE_SUB(
-        (SELECT MAX(STR_TO_DATE(date_int, '%Y%m%d')) FROM index_3day_indicators), 
-        INTERVAL 3 MONTH
-    )
-),
-tech_indicators AS (
-    SELECT
-        date_int,
-        -- 三日趋势指标（保持不变）
-        SUM(CASE WHEN kdjK > kdjD AND kdjk_day1 <= kdjd_day1 AND kdjk_day2 <= kdjd_day2 THEN 1 ELSE 0 END) AS kdj_golden_cross,
-        SUM(CASE WHEN kdjK < kdjD AND kdjk_day1 >= kdjd_day1 AND kdjk_day2 >= kdjd_day2 THEN 1 ELSE 0 END) AS kdj_dead_cross,
-        SUM(CASE WHEN wr_6 > wr_6_day1 AND wr_6_day1 > wr_6_day2 THEN 1 ELSE 0 END) AS wr_up_trend,
-        SUM(CASE WHEN cci > cci_day1 AND cci_day1 > cci_day2 THEN 1 ELSE 0 END) AS cci_up_trend,
-        -- 替代方案：使用KDJ/CCI的即时变化作为信号
-        SUM(CASE 
-            -- 买入信号：KDJ金叉且CCI突破-100
-            WHEN kdjK > kdjD 
-            AND kdjK_day1 <= kdjD_day1  -- 当日新金叉
-            AND cci > -100 
-            AND cci_day1 <= -100 
-            THEN 1 ELSE 0 
-        END) AS strong_buy_signal,
-        SUM(CASE 
-            -- 卖出信号：KDJ死叉且CCI下破+100
-            WHEN kdjK < kdjD 
-            AND kdjK_day1 >= kdjD_day1  -- 当日新死叉
-            AND cci < 100 
-            AND cci_day1 >= 100 
-            THEN 1 ELSE 0 
-        END) AS strong_sell_signal
-    FROM index_3day_indicators
-    WHERE code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-    GROUP BY date_int
-),
-up_sentiment AS (
-    SELECT
-        dr.date_int,
-        ROUND(IFNULL((COUNT(i3di.code_int) / 10.0) * 100, 0)) AS `指数上涨情绪`
-    FROM date_range dr
-    LEFT JOIN index_3day_indicators i3di 
-        ON dr.date_int = i3di.date_int
-        AND i3di.`kdjK` >= i3di.kdjk_day1
-        AND i3di.`kdjd` >= i3di.kdjd_day1
-        AND i3di.wr_6 >= i3di.wr_6_day1
-        AND i3di.cci >= i3di.cci_day1
-        AND i3di.code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-        AND i3di.`kdjk` <= 45
-        AND i3di.`kdjd` <= 45
-        AND i3di.`kdjj` <= 75
-    GROUP BY dr.date_int
-),
-down_sentiment AS (
-    SELECT
-        dr.date_int,
-        ROUND(IFNULL((COUNT(i3di.code_int) / 10.0) * 100, 0)) AS `指数下跌情绪`
-    FROM date_range dr
-    LEFT JOIN index_3day_indicators i3di 
-        ON dr.date_int = i3di.date_int
-        AND i3di.`kdjK` <= i3di.kdjk_day1
-        AND i3di.`kdjd` <= i3di.kdjd_day1
-        AND i3di.wr_6 <= i3di.wr_6_day1
-        AND i3di.cci <= i3di.cci_day1
-        AND i3di.cci_day1 <= i3di.cci_day2
-        AND i3di.code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-        AND i3di.`kdjk` >= 60
-        AND i3di.`kdjd` >= 60
-        AND ABS(i3di.`wr_6`) <= 70
-    GROUP BY dr.date_int
-),
-
-final_data AS (
-    SELECT
-        us.date_int,
-        us.`指数上涨情绪`,
-        ds.`指数下跌情绪`,
-        ti.kdj_golden_cross,
-        ti.kdj_dead_cross,
-        ti.wr_up_trend,
-        ti.cci_up_trend,
-        ti.strong_buy_signal,
-        ti.strong_sell_signal,
-        -- 动态阈值计算（根据实际指数数量）
-        (SELECT COUNT(DISTINCT code_int) FROM index_3day_indicators) * 0.6 * 2 AS up_threshold,
-        (SELECT COUNT(DISTINCT code_int) FROM index_3day_indicators) * 0.4 * 2 AS down_threshold
-    FROM up_sentiment us
-    JOIN down_sentiment ds ON us.date_int = ds.date_int
-    JOIN tech_indicators ti ON us.date_int = ti.date_int
-)
-
-SELECT 
-    date_int,
-    `指数上涨情绪`,
-    `指数下跌情绪`,
-    `操作建议`,
-    -- 市场情绪字段处理
-    CASE
-        WHEN `操作建议` IS NOT NULL THEN 
-            LEFT(
-                REPLACE(REPLACE(`操作建议`, '：', ''), '（', ''),  -- 同时处理冒号和括号
-                4
-            )
-        ELSE '未知情绪'
-    END AS `市场情绪`
-FROM (
-    SELECT 
-        date_int,
-        `指数上涨情绪`,
-        `指数下跌情绪`,
-        -- 原操作建议字段定义
-        CASE
-            WHEN `指数上涨情绪` = 10 OR `指数下跌情绪` = 10 THEN 
-                CASE 
-                    WHEN strong_buy_signal > 2 THEN CONCAT('观察阶段：趋势可能反转，',strong_buy_signal,'个买点信号')
-                    WHEN strong_sell_signal > 2 THEN CONCAT('观察阶段：趋势可能反转，',strong_sell_signal,'个卖点信号')
-                    ELSE '观察阶段：趋势可能反转，保持关注'
-                END
-            WHEN `指数上涨情绪` = 100 AND `指数下跌情绪` = 0 THEN 
-                CASE 
-                    WHEN strong_buy_signal >= 5 THEN '满仓持有：市场极度乐观，警惕超买风险'
-                    ELSE '满仓持有：维持仓位，注意止盈' 
-                END
-            WHEN `指数上涨情绪` > 0 AND `指数下跌情绪` = 0 THEN 
-                CASE 
-                    WHEN strong_buy_signal > 0 THEN CONCAT('上行趋势：建议持仓待涨（',strong_buy_signal,'个买点信号）')
-                    ELSE '上行趋势：建议分批建仓'
-                END
-            WHEN `指数上涨情绪` = 0 AND `指数下跌情绪` > 0 THEN 
-                CASE 
-                    WHEN strong_sell_signal > 0 THEN CONCAT('下行趋势：建议控制仓位（',strong_sell_signal,'个卖点信号）')
-                    ELSE '下行趋势：建议反弹减仓'
-                END
-            WHEN `指数上涨情绪` = 0 AND `指数下跌情绪` = 100 THEN 
-                CASE 
-                    WHEN strong_sell_signal >= 5 THEN '空仓观望：市场恐慌抛售，等待企稳'
-                    ELSE '空仓观望：保持现金仓位' 
-                END
-            WHEN `指数上涨情绪` = 0 AND `指数下跌情绪` = 0 THEN 
-                CASE 
-                    WHEN kdj_golden_cross > 0 OR (wr_up_trend + cci_up_trend) >= up_threshold THEN
-                        CASE 
-                            WHEN strong_buy_signal > 0 THEN CONCAT('上行震荡：建议逢低布局（',strong_buy_signal,'个买点）')
-                            ELSE '上行震荡：建议分批建仓'
-                        END
-                    WHEN kdj_dead_cross > 0 OR (wr_up_trend + cci_up_trend) <= down_threshold THEN
-                        CASE 
-                            WHEN strong_sell_signal > 0 THEN CONCAT('下行震荡：建议反弹减仓（',strong_sell_signal,'个卖点）')
-                            ELSE '下行震荡：建议控制仓位'
-                        END
-                    ELSE 
-                        CASE 
-                            WHEN strong_buy_signal > strong_sell_signal THEN CONCAT('多空平衡：买盘占优（',strong_buy_signal,'次信号）')
-                            WHEN strong_sell_signal > strong_buy_signal THEN CONCAT('多空平衡：卖盘占优（',strong_sell_signal,'次信号）')
-                            ELSE '多空平衡：建议保持观望'
-                        END
-                END
-            ELSE '未知状态：暂时无法识别市场状态'
-        END AS `操作建议`
-    FROM final_data
-) AS sub_query
-ORDER BY date_int DESC;
-
--- 获取的字段为date_int,指数上涨情绪，指数下跌情绪，操作建议，市场情绪
-
-2、market_sentiment_a表的字段：id(自生成主键)，date_int（int类型），指数上涨情绪（FLOAT类型），指数下跌情绪（FLOAT类型），操作建议（VARCHAR(120)），市场情绪（VARCHAR(50)）
-
-'''
 
 
 
@@ -203,169 +32,243 @@ def get_market_sentiment_data():
         create_optimized_table()
 
         sql = f"""
-        WITH date_range AS (
-            SELECT DISTINCT date_int
-            FROM index_3day_indicators
-            WHERE STR_TO_DATE(date_int, '%Y%m%d') >= DATE_SUB(
-                (SELECT MAX(STR_TO_DATE(date_int, '%Y%m%d')) FROM index_3day_indicators), 
-                INTERVAL 3 MONTH
+        WITH `date_range` AS (
+          SELECT DISTINCT
+            `index_3day_indicators`.`date_int` AS `date_int`
+          FROM
+            `index_3day_indicators`
+          WHERE
+            (
+              str_to_date(`index_3day_indicators`.`date_int`, '%Y%m%d') >= ((SELECT max(str_to_date(`index_3day_indicators`.`date_int`, '%Y%m%d')) FROM `index_3day_indicators`) - INTERVAL 2 MONTH)
             )
         ),
-        tech_indicators AS (
-            SELECT
-                date_int,
-                -- 三日趋势指标（保持不变）
-                SUM(CASE WHEN kdjK > kdjD AND kdjk_day1 <= kdjd_day1 AND kdjk_day2 <= kdjd_day2 THEN 1 ELSE 0 END) AS kdj_golden_cross,
-                SUM(CASE WHEN kdjK < kdjD AND kdjk_day1 >= kdjd_day1 AND kdjk_day2 >= kdjd_day2 THEN 1 ELSE 0 END) AS kdj_dead_cross,
-                SUM(CASE WHEN wr_6 > wr_6_day1 AND wr_6_day1 > wr_6_day2 THEN 1 ELSE 0 END) AS wr_up_trend,
-                SUM(CASE WHEN cci > cci_day1 AND cci_day1 > cci_day2 THEN 1 ELSE 0 END) AS cci_up_trend,
-                -- 替代方案：使用KDJ/CCI的即时变化作为信号
-                SUM(CASE 
-                    -- 买入信号：KDJ金叉且CCI突破-100
-                    WHEN kdjK > kdjD 
-                    AND kdjK_day1 <= kdjD_day1  -- 当日新金叉
-                    AND cci > -100 
-                    AND cci_day1 <= -100 
-                    THEN 1 ELSE 0 
-                END) AS strong_buy_signal,
-                SUM(CASE 
-                    -- 卖出信号：KDJ死叉且CCI下破+100
-                    WHEN kdjK < kdjD 
-                    AND kdjK_day1 >= kdjD_day1  -- 当日新死叉
-                    AND cci < 100 
-                    AND cci_day1 >= 100 
-                    THEN 1 ELSE 0 
-                END) AS strong_sell_signal
-            FROM index_3day_indicators
-            WHERE code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-            GROUP BY date_int
+        `up_sentiment` AS (
+          SELECT
+            `index_3day_indicators`.`date_int` AS `date_int`,
+            round(((count(DISTINCT `index_3day_indicators`.`code_int`) * 100.0) / 10), 0) AS `指数上涨情绪`
+          FROM
+            `index_3day_indicators`
+          WHERE
+            (
+              (`index_3day_indicators`.`code_int` IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050))
+              AND (`index_3day_indicators`.`kdjk` >= `index_3day_indicators`.`kdjk_day1`)
+              AND (`index_3day_indicators`.`kdjd` >= `index_3day_indicators`.`kdjd_day1`)
+              AND (`index_3day_indicators`.`wr_6` >= `index_3day_indicators`.`wr_6_day1`)
+              AND (`index_3day_indicators`.`cci` >= `index_3day_indicators`.`cci_day1`)
+              AND (`index_3day_indicators`.`kdjk` <= 80)
+              AND (`index_3day_indicators`.`kdjd` <= 80)
+              AND (`index_3day_indicators`.`kdjj` <= 100)
+            )
+          GROUP BY
+            `index_3day_indicators`.`date_int`
         ),
-        up_sentiment AS (
-            SELECT
-                dr.date_int,
-                ROUND(IFNULL((COUNT(i3di.code_int) / 10.0) * 100, 0)) AS `指数上涨情绪`
-            FROM date_range dr
-            LEFT JOIN index_3day_indicators i3di 
-                ON dr.date_int = i3di.date_int
-                AND i3di.`kdjK` >= i3di.kdjk_day1
-                AND i3di.`kdjd` >= i3di.kdjd_day1
-                AND i3di.wr_6 >= i3di.wr_6_day1
-                AND i3di.cci >= i3di.cci_day1
-                AND i3di.code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-                AND i3di.`kdjk` <= 45
-                AND i3di.`kdjd` <= 45
-                AND i3di.`kdjj` <= 75
-            GROUP BY dr.date_int
+        `down_sentiment` AS (
+          SELECT
+            `index_3day_indicators`.`date_int` AS `date_int`,
+            round(((count(DISTINCT `index_3day_indicators`.`code_int`) * 100.0) / 10), 0) AS `指数下跌情绪`
+          FROM
+            `index_3day_indicators`
+          WHERE
+            (
+              (`index_3day_indicators`.`code_int` IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050))
+              AND (`index_3day_indicators`.`kdjk` <= `index_3day_indicators`.`kdjk_day1`)
+              AND (`index_3day_indicators`.`kdjd` <= `index_3day_indicators`.`kdjd_day1`)
+              AND (`index_3day_indicators`.`wr_6` <= `index_3day_indicators`.`wr_6_day1`)
+              AND (`index_3day_indicators`.`cci` <= `index_3day_indicators`.`cci_day1`)
+              AND (`index_3day_indicators`.`cci_day1` <= `index_3day_indicators`.`cci_day2`)
+              AND (`index_3day_indicators`.`kdjk` >= 50)
+              AND (`index_3day_indicators`.`kdjd` >= 50)
+            )
+          GROUP BY
+            `index_3day_indicators`.`date_int`
         ),
-        down_sentiment AS (
-            SELECT
-                dr.date_int,
-                ROUND(IFNULL((COUNT(i3di.code_int) / 10.0) * 100, 0)) AS `指数下跌情绪`
-            FROM date_range dr
-            LEFT JOIN index_3day_indicators i3di 
-                ON dr.date_int = i3di.date_int
-                AND i3di.`kdjK` <= i3di.kdjk_day1
-                AND i3di.`kdjd` <= i3di.kdjd_day1
-                AND i3di.wr_6 <= i3di.wr_6_day1
-                AND i3di.cci <= i3di.cci_day1
-                AND i3di.cci_day1 <= i3di.cci_day2
-                AND i3di.code_int IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050)
-                AND i3di.`kdjk` >= 60
-                AND i3di.`kdjd` >= 60
-                AND ABS(i3di.`wr_6`) <= 70
-            GROUP BY dr.date_int
-        ),
-
-        final_data AS (
-            SELECT
-                us.date_int,
-                us.`指数上涨情绪`,
-                ds.`指数下跌情绪`,
-                ti.kdj_golden_cross,
-                ti.kdj_dead_cross,
-                ti.wr_up_trend,
-                ti.cci_up_trend,
-                ti.strong_buy_signal,
-                ti.strong_sell_signal,
-                -- 动态阈值计算（根据实际指数数量）
-                (SELECT COUNT(DISTINCT code_int) FROM index_3day_indicators) * 0.6 * 2 AS up_threshold,
-                (SELECT COUNT(DISTINCT code_int) FROM index_3day_indicators) * 0.4 * 2 AS down_threshold
-            FROM up_sentiment us
-            JOIN down_sentiment ds ON us.date_int = ds.date_int
-            JOIN tech_indicators ti ON us.date_int = ti.date_int
-        )
-
-        SELECT 
-            date_int,
-            `指数上涨情绪`,
-            `指数下跌情绪`,
-            `操作建议`,
-            -- 市场情绪字段处理
-            CASE
-                WHEN `操作建议` IS NOT NULL THEN 
-                    LEFT(
-                        REPLACE(REPLACE(`操作建议`, '：', ''), '（', ''),  -- 同时处理冒号和括号
-                        4
-                    )
-                ELSE '未知情绪'
-            END AS `市场情绪`
-        FROM (
-            SELECT 
-                date_int,
-                `指数上涨情绪`,
-                `指数下跌情绪`,
-                -- 原操作建议字段定义
+        `signals` AS (
+          SELECT
+            `index_3day_indicators`.`date_int` AS `date_int`,
+            sum(
+              (
                 CASE
-                    WHEN `指数上涨情绪` = 10 OR `指数下跌情绪` = 10 THEN 
-                        CASE 
-                            WHEN strong_buy_signal > 2 THEN CONCAT('观察阶段：趋势可能反转，',strong_buy_signal,'个买点信号')
-                            WHEN strong_sell_signal > 2 THEN CONCAT('观察阶段：趋势可能反转，',strong_sell_signal,'个卖点信号')
-                            ELSE '观察阶段：趋势可能反转，保持关注'
-                        END
-                    WHEN `指数上涨情绪` = 100 AND `指数下跌情绪` = 0 THEN 
-                        CASE 
-                            WHEN strong_buy_signal >= 5 THEN '满仓持有：市场极度乐观，警惕超买风险'
-                            ELSE '满仓持有：维持仓位，注意止盈' 
-                        END
-                    WHEN `指数上涨情绪` > 0 AND `指数下跌情绪` = 0 THEN 
-                        CASE 
-                            WHEN strong_buy_signal > 0 THEN CONCAT('上行趋势：建议持仓待涨（',strong_buy_signal,'个买点信号）')
-                            ELSE '上行趋势：建议分批建仓'
-                        END
-                    WHEN `指数上涨情绪` = 0 AND `指数下跌情绪` > 0 THEN 
-                        CASE 
-                            WHEN strong_sell_signal > 0 THEN CONCAT('下行趋势：建议控制仓位（',strong_sell_signal,'个卖点信号）')
-                            ELSE '下行趋势：建议反弹减仓'
-                        END
-                    WHEN `指数上涨情绪` = 0 AND `指数下跌情绪` = 100 THEN 
-                        CASE 
-                            WHEN strong_sell_signal >= 5 THEN '空仓观望：市场恐慌抛售，等待企稳'
-                            ELSE '空仓观望：保持现金仓位' 
-                        END
-                    WHEN `指数上涨情绪` = 0 AND `指数下跌情绪` = 0 THEN 
-                        CASE 
-                            WHEN kdj_golden_cross > 0 OR (wr_up_trend + cci_up_trend) >= up_threshold THEN
-                                CASE 
-                                    WHEN strong_buy_signal > 0 THEN CONCAT('上行震荡：建议逢低布局（',strong_buy_signal,'个买点）')
-                                    ELSE '上行震荡：建议分批建仓'
-                                END
-                            WHEN kdj_dead_cross > 0 OR (wr_up_trend + cci_up_trend) <= down_threshold THEN
-                                CASE 
-                                    WHEN strong_sell_signal > 0 THEN CONCAT('下行震荡：建议反弹减仓（',strong_sell_signal,'个卖点）')
-                                    ELSE '下行震荡：建议控制仓位'
-                                END
-                            ELSE 
-                                CASE 
-                                    WHEN strong_buy_signal > strong_sell_signal THEN CONCAT('多空平衡：买盘占优（',strong_buy_signal,'次信号）')
-                                    WHEN strong_sell_signal > strong_buy_signal THEN CONCAT('多空平衡：卖盘占优（',strong_sell_signal,'次信号）')
-                                    ELSE '多空平衡：建议保持观望'
-                                END
-                        END
-                    ELSE '未知状态：暂时无法识别市场状态'
-                END AS `操作建议`
-            FROM final_data
-        ) AS sub_query
-        ORDER BY date_int DESC;
+                  WHEN (
+                      (`index_3day_indicators`.`kdjk` > `index_3day_indicators`.`kdjd`)
+                      AND (`index_3day_indicators`.`kdjk_day1` <= `index_3day_indicators`.`kdjd_day1`)
+                      AND (`index_3day_indicators`.`kdjd` > `index_3day_indicators`.`kdjd_day1`)
+                      AND (`index_3day_indicators`.`cci` > `index_3day_indicators`.`cci_day1`)
+                    ) THEN
+                    1
+                  ELSE
+                    0
+                END
+              )
+            ) AS `strong_buy_signal`,
+            sum(
+              (
+                CASE
+                  WHEN (
+                      (`index_3day_indicators`.`kdjk` < `index_3day_indicators`.`kdjd`)
+                      AND (`index_3day_indicators`.`kdjd` < `index_3day_indicators`.`kdjd_day1`)
+                      AND (`index_3day_indicators`.`kdjk_day1` >= `index_3day_indicators`.`kdjd_day1`)
+                      AND (`index_3day_indicators`.`cci` < `index_3day_indicators`.`cci_day1`)
+                    ) THEN
+                    1
+                  ELSE
+                    0
+                END
+              )
+            ) AS `strong_sell_signal`
+          FROM
+            `index_3day_indicators`
+          WHERE
+            (`index_3day_indicators`.`code_int` IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050))
+          GROUP BY
+            `index_3day_indicators`.`date_int`
+        ),
+        `final_result` AS (
+          SELECT
+            `dr`.`date_int` AS `date_int`,
+            COALESCE(`us`.`指数上涨情绪`, 0) AS `指数上涨情绪`,
+            COALESCE(`ds`.`指数下跌情绪`, 0) AS `指数下跌情绪`,
+            COALESCE(`s`.`strong_buy_signal`, 0) AS `strong_buy_signal`,
+            COALESCE(`s`.`strong_sell_signal`, 0) AS `strong_sell_signal`,
+            (
+              CASE
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) BETWEEN 70 AND 100)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) > 5)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '满仓持有：市场极度乐观'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) BETWEEN 70 AND 100)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) <= 5)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '重仓持有：持仓待涨，注意止盈'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) BETWEEN 40 AND 60)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) > 2)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '上行趋势：建议持仓待涨，金叉'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) BETWEEN 40 AND 60)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) <= 2)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '上行趋势：建议分批建仓'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) BETWEEN 20 AND 30)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) > 2)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '上行震荡：建议逢低布局，金叉'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) BETWEEN 20 AND 30)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) <= 2)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '上行震荡：建议高抛低吸'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) BETWEEN 70 AND 100)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) >= 5)
+                  ) THEN
+                  '一键清仓：市场抛售，等待企稳'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) BETWEEN 70 AND 100)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) < 5)
+                  ) THEN
+                  '空仓观望：保持现金仓位'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) BETWEEN 40 AND 60)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) > 2)
+                  ) THEN
+                  '下行趋势：建议反弹减仓，死叉'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) BETWEEN 40 AND 60)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) <= 2)
+                  ) THEN
+                  '下行趋势：建议控制仓位'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) BETWEEN 20 AND 30)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) > 2)
+                  ) THEN
+                  '下行震荡：建议反弹减仓，死叉'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) BETWEEN 20 AND 30)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) <= 2)
+                  ) THEN
+                  '下行震荡：建议控制仓位'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '多空平衡：建议保持观望'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) > 1)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) = 0)
+                  ) THEN
+                  '多空平衡：可轻仓试水，金叉'
+                WHEN (
+                    (COALESCE(`us`.`指数上涨情绪`, 0) = 0)
+                    AND (COALESCE(`ds`.`指数下跌情绪`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_buy_signal`, 0) = 0)
+                    AND (COALESCE(`s`.`strong_sell_signal`, 0) > 0)
+                  ) THEN
+                  '多空平衡：不建议建仓，死叉'
+                WHEN ((COALESCE(`us`.`指数上涨情绪`, 0) = 10) OR (COALESCE(`ds`.`指数下跌情绪`, 0) = 10)) THEN
+                  '观察阶段：趋势可能反转'
+                ELSE
+                  '未知状态：建议止盈'
+              END
+            ) AS `操作建议`
+          FROM
+            (
+              (
+                (`date_range` `dr` LEFT JOIN `up_sentiment` `us` ON ((`dr`.`date_int` = `us`.`date_int`)))
+                LEFT JOIN `down_sentiment` `ds` ON ((`dr`.`date_int` = `ds`.`date_int`))
+              )
+              LEFT JOIN `signals` `s` ON ((`dr`.`date_int` = `s`.`date_int`))
+            )
+        ) SELECT
+          `final_result`.`date_int` AS `date_int`,
+          `final_result`.`指数上涨情绪` AS `指数上涨情绪`,
+          `final_result`.`指数下跌情绪` AS `指数下跌情绪`,
+          `final_result`.`strong_buy_signal` AS `strong_buy_signal`,
+          `final_result`.`strong_sell_signal` AS `strong_sell_signal`,
+          `final_result`.`操作建议` AS `操作建议`,
+          (
+            CASE
+              WHEN (`final_result`.`操作建议` IS NOT NULL) THEN
+                LEFT(REPLACE(REPLACE(`final_result`.`操作建议`, '：', ''), '（', ''), 4)
+              ELSE
+                '未知情绪'
+            END
+          ) AS `市场情绪`
+        FROM
+          `final_result`
+        ORDER BY
+          `final_result`.`date_int`
         """
         
         with mdb.engine().connect() as conn:
@@ -388,7 +291,8 @@ def get_market_sentiment_data():
 
 
 
-# 修改表结构（新增字段）
+
+
 def create_optimized_table():
     table_name = "market_sentiment_a"
     create_table_sql = f"""
@@ -397,12 +301,14 @@ def create_optimized_table():
         `date_int` INT NOT NULL COMMENT '日期YYYYMMDD格式',
         `指数上涨情绪` FLOAT,
         `指数下跌情绪` FLOAT,
+        `strong_buy_signal` INT,
+        `strong_sell_signal` INT,
         `操作建议` VARCHAR(120),
         `市场情绪` VARCHAR(50),
         UNIQUE KEY `idx_date` (`date_int`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='市场情绪分析表';
     """
-    
+ 
     # 使用新的连接检查并创建表
     with mdb.engine().connect() as conn:
         try:
@@ -418,32 +324,90 @@ def create_optimized_table():
             logging.error(f"创建表时发生错误: {e}")
             raise
 
-# 优化后的数据插入函数
+
+
 def optimized_data_insert(data):
     table_name = "market_sentiment_a"
     try:
-        # 自定义插入方法，使用INSERT IGNORE避免重复
-        def insert_ignore(table, conn, keys, data_iter):
+        with mdb.engine().connect() as conn:
+            # 确保表结构存在且最新
+            create_optimized_table()
+            
+            # 定义唯一键和需要更新的字段
+            unique_keys = {'date_int'}
+            metadata = MetaData()
+            table = Table(table_name, metadata, autoload_with=conn.engine)
+            
+            # 排除唯一键和自增主键，其他字段均更新
+            update_columns = [col.name for col in table.columns 
+                             if col.name not in unique_keys and col.name != 'id']
+
+            # 验证数据字段匹配
+            missing_columns = set(data.columns) - {col.name for col in table.columns}
+            if missing_columns:
+                raise ValueError(f"数据包含表中不存在的列: {missing_columns}")
+
+        def upsert_data(table, conn, keys, data_iter):
             from sqlalchemy.dialects.mysql import insert
+            
             data_rows = [dict(zip(keys, row)) for row in data_iter]
             if not data_rows:
                 return
-            stmt = insert(table.table).values(data_rows).prefix_with('IGNORE')
-            conn.execute(stmt)
-        
-        # 使用自定义方法插入数据
+                
+            stmt = insert(table.table).values(data_rows)
+            update_dict = {col: stmt.inserted[col] for col in update_columns}
+            
+            # 调试：打印生成的SQL
+            compiled_stmt = stmt.on_duplicate_key_update(**update_dict).compile(
+                compile_kwargs={"literal_binds": True}
+            )
+            # print(f"\n[DEBUG] 执行SQL:\n{compiled_stmt}")
+            
+            result = conn.execute(stmt.on_duplicate_key_update(**update_dict))
+            # print(f"[DEBUG] 影响行数: {result.rowcount}")
+
         data.to_sql(
             name=table_name,
             con=mdb.engine(),
             if_exists='append',
             index=False,
-            chunksize=500,
-            method=insert_ignore
+            chunksize=500,  # 减小chunksize便于调试
+            method=upsert_data
         )
-        logging.info("数据插入完成，重复记录已自动忽略")
+        print("数据插入/更新成功")
+        logging.info("数据插入/更新成功")
+        
     except Exception as e:
-        logging.error(f"数据插入失败: {e}")
+        logging.error(f"操作失败，详细错误：{str(e)}", exc_info=True)
         raise
+
+
+# 优化后的数据插入函数
+# def optimized_data_insert(data):
+#     table_name = "market_sentiment_a"
+#     try:
+#         # 自定义插入方法，使用INSERT IGNORE避免重复
+#         def insert_ignore(table, conn, keys, data_iter):
+#             from sqlalchemy.dialects.mysql import insert
+#             data_rows = [dict(zip(keys, row)) for row in data_iter]
+#             if not data_rows:
+#                 return
+#             stmt = insert(table.table).values(data_rows).prefix_with('IGNORE')
+#             conn.execute(stmt)
+        
+#         # 使用自定义方法插入数据
+#         data.to_sql(
+#             name=table_name,
+#             con=mdb.engine(),
+#             if_exists='append',
+#             index=False,
+#             chunksize=500,
+#             method=insert_ignore
+#         )
+#         logging.info("数据插入完成，重复记录已自动忽略")
+#     except Exception as e:
+#         logging.error(f"数据插入失败: {e}")
+#         raise
 
 
 

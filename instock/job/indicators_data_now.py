@@ -33,6 +33,7 @@ import industry_data as industry_data
 import industry_sentiment_a as industry_sentiment_a
 import indicators_strategy_buy as indicators_strategy_buy
 import buy_20250425 as buy_20250425
+import basic_data as basic_data
 
 
 numeric_cols = ["f2", "f3", "f4", "f5", "f6", "f7", "f8", "f10", "f15", "f16", "f17", "f18", "f22", "f11", "f24", "f25", "f9", "f115", "f114", "f23", "f112", "f113", "f61", "f48", "f37", "f49", "f57", "f40", "f41", "f45", "f46", "f38", "f39", "f20", "f21" ]
@@ -496,6 +497,7 @@ CN_INDEX_SPOT = {
         'ups_downs': {'map': 'f4',  'type': FLOAT, 'cn': '涨跌额', 'size': 70, 'en': 'ups_downs'},
         'volume': {'map': 'f5',  'type': BIGINT, 'cn': '成交量', 'size': 90, 'en': 'volume'},
         'deal_amount': {'map': 'f6',  'type': BIGINT, 'cn': '成交额', 'size': 100, 'en': 'deal_amount'},
+        'amplitude': {'type': FLOAT, 'cn': '振幅', 'size': 70, 'map': 'f7', 'en': 'amplitude'},
         'open_price': {'map': 'f17',  'type': FLOAT, 'cn': '开盘价', 'size': 70, 'en': 'open_price'},
         'high_price': {'map': 'f15',  'type': FLOAT, 'cn': '最高价', 'size': 70, 'en': 'high_price'},
         'low_price': {'map': 'f16',  'type': FLOAT, 'cn': '最低价', 'size': 70, 'en': 'low_price'},
@@ -725,6 +727,7 @@ CN_ETF_SPOT = {
         'ups_downs': {'map': 'f4',  'type': FLOAT, 'cn': '涨跌额', 'size': 70, 'en': 'ups_downs'},
         'volume': {'map': 'f5',  'type': BIGINT, 'cn': '成交量', 'size': 90, 'en': 'volume'},
         'deal_amount': {'map': 'f6',  'type': BIGINT, 'cn': '成交额', 'size': 100, 'en': 'deal_amount'},
+        'amplitude': {'type': FLOAT, 'cn': '振幅', 'size': 70, 'map': 'f7', 'en': 'amplitude'},
         'open_price': {'map': 'f17',  'type': FLOAT, 'cn': '开盘价', 'size': 70, 'en': 'open_price'},
         'high_price': {'map': 'f15',  'type': FLOAT, 'cn': '最高价', 'size': 70, 'en': 'high_price'},
         'low_price': {'map': 'f16',  'type': FLOAT, 'cn': '最低价', 'size': 70, 'en': 'low_price'},
@@ -1100,15 +1103,18 @@ def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=500):
 
 
 def main():
-    stock_zijin.main()
+    # stock_zijin.main()
     # 实时股票 OK
-    stock_zh_a_spot_em()
+    # stock_zh_a_spot_em()
 
-    index_zh_a_spot_em()
+    # index_zh_a_spot_em()
 
-    etf_spot_em()
+    # etf_spot_em()
 
-    industry_zh_a_spot_em()
+    # industry_zh_a_spot_em()
+
+    #基础数据脚本会将实时数据回填到实时表、基础信息表、历史数据表
+    basic_data.main()
 
     indicators_data_daily.main()
 

@@ -23,6 +23,8 @@ import instock.core.tablestructure as tbs
 __author__ = 'hqm'
 __date__ = '2025/4/15'
 
+table_name = "cn_stock_indicators_sell"
+
 # 在文件顶部定义回测字段配置（替换tbs模块的引用）
 RATE_FIELDS_COUNT = 100
 TABLE_CN_STOCK_BACKTEST_DATA = {
@@ -37,34 +39,17 @@ TABLE_CN_STOCK_BACKTEST_DATA = {
 STRATEGY_CONFIG = {
     'strategy_a': {
         'conditions': """
-            AND 三日指标.kdjk <= 45 -- k处于超卖区域
-            AND 三日指标.kdjd <= 45  -- d处于超卖区域
-            AND 三日指标.kdjj <= 0   -- j处于超卖区域
-            AND 三日指标.cci < - 100 AND 三日指标.cci > 三日指标.cci_day1 
-            AND 三日指标.rsi_6 <= 30
-            --                 AND rsi_12 <= 45 
-            AND ABS(三日指标.wr_6) >= 90
-            AND ABS(三日指标.wr_10) >= 90
+            AND 三日指标.kdjd >= 70  -- d处于超买区域
+            AND 三日指标.kdjj >= 85  -- j处于超买区域
+            AND 三日指标.cci >= 110 
+            AND 三日指标.rsi_6 >= 65
+            AND 三日指标.rsi_12 >= 65  
+            AND ABS(三日指标.wr_6) <= 5
         """
     },
     'strategy_b': {
         'conditions': """
-            -- 当前K值 > 前1日K值
-            AND 三日指标.`kdjK` > 三日指标.kdjk_day1
-            AND 三日指标.kdjk_day1 > 三日指标.kdjk_day2
-            -- 当前D值 > 前1日D值
-            AND 三日指标.`kdjd` > 三日指标.kdjd_day1
-            AND 三日指标.kdjd_day1 > 三日指标.kdjd_day2
-            -- 前1日D值 > 前2日D值（形成连续上涨趋势）
-            AND 三日指标.wr_6 > 三日指标.wr_6_day1
-            AND 三日指标.wr_6_day1 > 三日指标.wr_6_day2
-            AND 三日指标.cci > 三日指标.cci_day1
-            AND 三日指标.cci_day1 > 三日指标.cci_day2
-            AND 三日指标.`kdjk` <= 45
-            -- 筛选条件2：D值小于等于30（超卖区域）
-            AND 三日指标.`kdjd` <= 45
-            -- 注意：这里同时满足K值和D值都在超卖区域 
-            AND 三日指标.`kdjj` <= 50
+
         """
     }
 }
@@ -180,7 +165,7 @@ def guess_buy(strategy_name, start_date_int, end_date_int=None):
 # sql字段名：up_sentiment,down_sentiment,code,name,date_int,kdjj,jingliuru_cn,close,turnover,industry,industry_kdjj,industry_kdjj_day1,industry_kdj,industry_wr,industry_cci,industry_sentiment
 # 修改表结构（新增字段）
 def create_optimized_table():
-    table_name = "cn_stock_indicators_buy"
+    # table_name = "cn_stock_indicators_sell"
     create_table_sql = f"""
     CREATE TABLE IF NOT EXISTS `{table_name}` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -229,7 +214,7 @@ def create_optimized_table():
 
 
 def optimized_data_insert(data):
-    table_name = "cn_stock_indicators_buy"
+    # table_name = "cn_stock_indicators_sell"
     try:
         with mdb.engine().connect() as conn:
             metadata = MetaData()
@@ -288,34 +273,6 @@ def optimized_data_insert(data):
         raise
 
 
-# 优化后的数据插入函数
-# def optimized_data_insert(data):
-#     table_name = "cn_stock_indicators_buy"
-#     try:
-#         # 自定义插入方法，使用INSERT IGNORE避免重复
-#         def insert_ignore(table, conn, keys, data_iter):
-#             from sqlalchemy.dialects.mysql import insert
-#             data_rows = [dict(zip(keys, row)) for row in data_iter]
-#             if not data_rows:
-#                 return
-#             stmt = insert(table.table).values(data_rows).prefix_with('IGNORE')
-#             conn.execute(stmt)
-        
-#         # 使用自定义方法插入数据
-#         data.to_sql(
-#             name=table_name,
-#             con=mdb.engine(),
-#             if_exists='append',
-#             index=False,
-#             chunksize=500,
-#             method=insert_ignore
-#         )
-#         logging.info("数据插入完成，重复记录已自动忽略")
-#     except Exception as e:
-#         logging.error(f"数据插入失败: {e}")
-#         raise
-
-
 def main():
     """主入口函数"""
     start_time = time.time()
@@ -343,7 +300,7 @@ def main():
             return
 
         # 定义要运行的策略列表
-        strategies = ['strategy_a', 'strategy_b']
+        strategies = ['strategy_a']
         
         # 遍历执行所有策略
         for strategy in strategies:
@@ -357,8 +314,9 @@ def main():
     except Exception as e:
         logging.error(f"执行失败: {e}")
     finally:
-        print(f"indicators_strategy_buy\n🕒 总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
+        print(f"strategy_stock_sell\n🕒 总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
 
 
 if __name__ == '__main__':
+
     main()

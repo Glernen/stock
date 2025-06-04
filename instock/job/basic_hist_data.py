@@ -26,6 +26,12 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+    "Accept": "*/*",
+    "Accept-Language": "zh-CN,zh;q=0.9",
+    "Connection": "keep-alive"
+}
 
 def is_a_stock(code):
     """判断是否属于需要采集的A股"""
@@ -182,7 +188,7 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
     # monthly_data = pd.DataFrame()
 
     # 多线程获取数据
-    with ThreadPoolExecutor(max_workers=20) as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         futures = []
         for _, row in stock_df.iterrows():
             code = row['code']
@@ -246,7 +252,7 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
     # monthly_data = pd.DataFrame()
 
     # 多线程获取数据
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         futures = []
         for _, row in stock_df.iterrows():
             code = row['code']
@@ -310,7 +316,7 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
     # monthly_data = pd.DataFrame()
 
     # 多线程获取数据
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=1) as executor:
         futures = []
         for _, row in stock_df.iterrows():
             code = row['code']
@@ -346,6 +352,21 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
     # print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
     print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}）")
 
+
+'''
+# https://push2his.eastmoney.com/api/qt/stock/kline/get?secid=1.000001&
+ut=fa5fd1943c7b386f172d6893dbfba10b&
+fields1=f1%2Cf2%2Cf3%2Cf4%2Cf5%2Cf6&
+fields2=f51%2Cf52%2Cf53%2Cf54%2Cf55%2Cf56%2Cf57%2Cf58%2Cf59%2Cf60%2Cf61&
+klt=101&
+fqt=1&
+beg=0&
+end=20500101&
+smplmt=460&
+lmt=1000000&
+_=1748611807385
+'''
+
 def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_type: str, beg: str, end: str):
     """通用函数：获取单个代码的历史数据（股票/ETF/指数）"""
     try:
@@ -371,11 +392,12 @@ def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_ty
             # "end": datetime.datetime.now().strftime("%Y%m%d"),
             "beg": beg,  # 使用传入的beg
             "end": end,  # 使用传入的end
+            "lmt": "1000000",
             "_": int(time.time()*1000)
         }
 
         # 发送请求与数据处理（与原逻辑一致）
-        r = requests.get(url, params=params, timeout=10)
+        r = requests.get(url, params=params, headers=HEADERS, timeout=10)
         data_json = r.json()
         if not data_json.get("data"):
             return None

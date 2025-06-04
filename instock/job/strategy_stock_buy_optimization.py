@@ -32,43 +32,7 @@ TABLE_CN_STOCK_BACKTEST_DATA = {
     }
 }
 
-# sql字段名：up_sentiment,down_sentiment,code,name,date_int,kdjj,jingliuru_cn,close,turnover,industry,industry_kdjj,industry_kdjj_day1,industry_kdj,industry_wr,industry_cci,industry_sentiment
-# 在文件顶部新增策略配置
-STRATEGY_CONFIG = {
-    'strategy_a': {
-        'conditions': """
-            AND 三日指标.kdjk <= 45 -- k处于超卖区域
-            AND 三日指标.kdjd <= 45  -- d处于超卖区域
-            AND 三日指标.kdjj <= 0   -- j处于超卖区域
-            AND 三日指标.cci < - 100 AND 三日指标.cci > 三日指标.cci_day1 
-            AND 三日指标.rsi_6 <= 30
-            --                 AND rsi_12 <= 45 
-            AND ABS(三日指标.wr_6) >= 90
-            AND ABS(三日指标.wr_10) >= 90
-        """
-    },
-    'strategy_b': {
-        'conditions': """
-            -- 当前K值 > 前1日K值
-            AND 三日指标.`kdjK` > 三日指标.kdjk_day1
-            AND 三日指标.kdjk_day1 > 三日指标.kdjk_day2
-            -- 当前D值 > 前1日D值
-            AND 三日指标.`kdjd` > 三日指标.kdjd_day1
-            AND 三日指标.kdjd_day1 > 三日指标.kdjd_day2
-            -- 前1日D值 > 前2日D值（形成连续上涨趋势）
-            AND 三日指标.wr_6 > 三日指标.wr_6_day1
-            AND 三日指标.wr_6_day1 > 三日指标.wr_6_day2
-            AND 三日指标.cci > 三日指标.cci_day1
-            AND 三日指标.cci_day1 > 三日指标.cci_day2
-            AND 三日指标.`kdjk` <= 45
-            -- 筛选条件2：D值小于等于30（超卖区域）
-            AND 三日指标.`kdjd` <= 45
-            -- 注意：这里同时满足K值和D值都在超卖区域 
-            AND 三日指标.`kdjj` <= 50
-        """
-    }
-}
-
+table_name = "strategy_stock_buy_optimization"
 
 def validate_date(date_str):
     """验证日期格式是否为YYYYMMDD"""
@@ -94,16 +58,16 @@ def get_default_dates():
 def build_date_condition(start_date, end_date=None):
     """构建SQL日期条件"""
     if end_date is None or start_date == end_date:
-        return f"三日指标.date_int = {start_date}"
-    return f"三日指标.date_int BETWEEN {start_date} AND {end_date}"
+        return f"csi.date_int = {start_date}"
+    return f"csi.date_int BETWEEN {start_date} AND {end_date}"
 
-def guess_buy(strategy_name, start_date_int, end_date_int=None):
+def guess_buy(start_date_int, end_date_int=None):
     """核心分析逻辑"""
     try:
         # 获取策略条件
-        strategy_cond = STRATEGY_CONFIG.get(strategy_name, {}).get('conditions')
-        if not strategy_cond:
-            raise ValueError(f"未知策略: {strategy_name}")
+        # strategy_cond = STRATEGY_CONFIG.get(strategy_name, {}).get('conditions')
+        # if not strategy_cond:
+        #     raise ValueError(f"未知策略: {strategy_name}")
 
         # 确保表存在
         create_optimized_table()
@@ -112,43 +76,59 @@ def guess_buy(strategy_name, start_date_int, end_date_int=None):
         date_condition = build_date_condition(start_date_int, end_date_int)
 
         sql = f"""
-        SELECT
-            大盘情绪.指数上涨情绪 AS up_sentiment,
-            大盘情绪.指数下跌情绪 AS down_sentiment,
-        --     大盘情绪.操作建议,
-            三日指标.code ,
-            三日指标.code_int ,
-            三日指标.name ,
-            三日指标.date ,
-            三日指标.date_int ,
-            三日指标.kdjj,
-            资金.jingliuru_cn ,
-            三日指标.close ,
-            三日指标.turnover ,
-            三日指标.industry ,
-            行业指标.kdjj AS industry_kdjj,
-            行业指标.kdjj_day1 AS industry_kdjj_day1,
-        --     行业数据.行业名称,
-            行业数据.KDJ趋势 AS industry_kdj,
-            行业数据.WR趋势 AS industry_wr,
-            行业数据.CCI趋势 AS industry_cci,
-        --     行业数据.强烈买入信号,
-        --     行业数据.强烈卖出信号,
-            行业数据.行业情绪  AS industry_sentiment
-        FROM
-            stock_3day_indicators 三日指标
-            LEFT JOIN cn_stock_info 基础信息 ON 基础信息.code_int = 三日指标.code_int
-            LEFT JOIN stock_zijin 资金 ON 资金.code_int = 三日指标.code_int AND 资金.date_int = 三日指标.date_int
-            LEFT JOIN market_sentiment_a 大盘情绪 ON 大盘情绪.date_int = 三日指标.date_int
-            LEFT JOIN industry_3day_indicators 行业指标 ON 行业指标.name = 三日指标.industry AND 行业指标.date_int = 三日指标.date_int
-            LEFT JOIN industry_sentiment_a 行业数据 ON 行业数据.行业名称 = 三日指标.industry AND 行业数据.date_int = 三日指标.date_int
-        WHERE 
-            {date_condition}
-            {strategy_cond}  # 插入策略特定条件
-            AND 三日指标.NAME NOT LIKE '%ST%' 
-            AND 基础信息.industry NOT REGEXP '酿酒行业|美容护理|农药兽药|食品饮料|光伏设备|煤炭行业|造纸印刷|保险' 
-        ORDER BY
-            三日指标.date_int;
+        WITH latest_date AS (
+            SELECT 
+                MAX(`date_int`) AS latest_date_int
+            FROM 
+                `stock_3day_indicators`
+        ),
+        buy_all AS (
+            SELECT *
+            FROM 
+                `cn_stock_indicators_buy` csi
+        --     JOIN latest_date ON csi.`date_int` = latest_date.latest_date_int
+            WHERE 
+                
+                -- AND csi.`date_int` > 20250409
+                {date_condition}
+                AND csi.`rate_60` IS NULL 
+                AND (csi.`strategy` = 'strategy_a' OR csi.`strategy` = 'strategy_b') 
+                -- AND csi.`industry_kdj` = '上涨趋势' 
+                AND csi.`code` NOT LIKE '688%' 
+                AND csi.`code` NOT LIKE '8%' 
+            AND (
+            -- 大盘强势上涨：大盘指标上涨，行业指标上涨，个股换手率小于20%的精筛股
+                    (csi.`up_sentiment` > 10
+                AND csi.`up_sentiment` < 50
+                AND csi.`down_sentiment` = 0
+                AND csi.`industry_kdj` = '上涨趋势'
+                AND csi.`industry_kdjj` < 60
+                AND csi.`industry_sentiment` = '行业震荡中性'
+                AND csi.`turnover` > 1
+                AND csi.`industry_cci` != '方向不明')
+            -- 大盘强势上涨：大盘指标上涨，行业指标上涨
+            OR (csi.`up_sentiment` >= 50
+                AND csi.`down_sentiment` = 0
+                AND csi.`industry_kdj` = '上涨趋势'
+                AND csi.`industry_sentiment` = '行业强势看涨'
+                and csi.`turnover` > 0.5
+                AND csi.`industry_cci` != '方向不明' )
+            --     -- 大盘震荡期：大盘指标上涨（指数K值小于60为标准）小于2个指数盘，行业指标上涨，个股换手率小于20%的精筛股
+            OR (csi.`up_sentiment` <= 20
+                AND csi.`industry_kdj` = '上涨趋势'
+                AND csi.`industry_wr` = '持续超买'
+                AND csi.`turnover` < 20)
+            --     -- 大盘上涨初现：大盘指标上涨，行业指标未墙裂上涨且处于超卖区，个股换手率大于1%的精筛股
+            OR (csi.`up_sentiment` >= 30
+                AND csi.`down_sentiment` = 0
+                AND csi.`industry_kdj` = '下降趋势'
+                AND csi.`industry_kdjj` < 20
+                AND csi.`industry_sentiment` = '行业震荡中性'
+                AND csi.`turnover` > 1)
+                )
+        )
+        SELECT * 
+        FROM buy_all 
         """
         
         with mdb.engine().connect() as conn:
@@ -161,9 +141,6 @@ def guess_buy(strategy_name, start_date_int, end_date_int=None):
         # 新增列合并逻辑（关键修改点）
         _columns_backtest = tuple(TABLE_CN_STOCK_BACKTEST_DATA['columns'])
         data = pd.concat([data, pd.DataFrame(columns=_columns_backtest)])
-
-        # 添加策略标识
-        data['strategy'] = strategy_name
 
         # 移除调试用的错误print语句，替换为日志输出
         logging.debug(f"处理日期范围: {start_date_int} 至 {end_date_int or start_date_int}")
@@ -180,7 +157,6 @@ def guess_buy(strategy_name, start_date_int, end_date_int=None):
 # sql字段名：up_sentiment,down_sentiment,code,name,date_int,kdjj,jingliuru_cn,close,turnover,industry,industry_kdjj,industry_kdjj_day1,industry_kdj,industry_wr,industry_cci,industry_sentiment
 # 修改表结构（新增字段）
 def create_optimized_table():
-    table_name = "cn_stock_indicators_buy"
     create_table_sql = f"""
     CREATE TABLE IF NOT EXISTS `{table_name}` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -208,7 +184,7 @@ def create_optimized_table():
         UNIQUE KEY `idx_unique` (`date_int`,`code_int`,`strategy`),
         KEY `idx_code` (`code_int`),
         KEY `idx_date` (`date_int`)
-    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='选股结果表';
+    ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='选股结果优化表';
     """
     
     # 使用新的连接检查并创建表
@@ -229,7 +205,6 @@ def create_optimized_table():
 
 
 def optimized_data_insert(data):
-    table_name = "cn_stock_indicators_buy"
     try:
         with mdb.engine().connect() as conn:
             metadata = MetaData()
@@ -288,33 +263,6 @@ def optimized_data_insert(data):
         raise
 
 
-# 优化后的数据插入函数
-# def optimized_data_insert(data):
-#     table_name = "cn_stock_indicators_buy"
-#     try:
-#         # 自定义插入方法，使用INSERT IGNORE避免重复
-#         def insert_ignore(table, conn, keys, data_iter):
-#             from sqlalchemy.dialects.mysql import insert
-#             data_rows = [dict(zip(keys, row)) for row in data_iter]
-#             if not data_rows:
-#                 return
-#             stmt = insert(table.table).values(data_rows).prefix_with('IGNORE')
-#             conn.execute(stmt)
-        
-#         # 使用自定义方法插入数据
-#         data.to_sql(
-#             name=table_name,
-#             con=mdb.engine(),
-#             if_exists='append',
-#             index=False,
-#             chunksize=500,
-#             method=insert_ignore
-#         )
-#         logging.info("数据插入完成，重复记录已自动忽略")
-#     except Exception as e:
-#         logging.error(f"数据插入失败: {e}")
-#         raise
-
 
 def main():
     """主入口函数"""
@@ -342,23 +290,16 @@ def main():
             print("3. 日期区间     -> python script.py 20230101 20230105")
             return
 
-        # 定义要运行的策略列表
-        strategies = ['strategy_a', 'strategy_b']
-        
-        # 遍历执行所有策略
-        for strategy in strategies:
-            logging.info(f"正在执行策略: {strategy}")
-            guess_buy(
-                strategy_name=strategy,
-                start_date_int=start_date,
-                end_date_int=end_date
-            )
+
+        guess_buy(
+            start_date_int=start_date,
+            end_date_int=end_date
+        )
         
     except Exception as e:
         logging.error(f"执行失败: {e}")
     finally:
-        print(f"indicators_strategy_buy\n🕒 总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
-
+        print(f"strategy_stock_buy_optimization\n🕒 总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
 
 if __name__ == '__main__':
     main()

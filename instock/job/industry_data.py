@@ -426,11 +426,11 @@ def industry_zh_a_spot_em() -> pd.DataFrame:
                 
                 # 执行批量插入
                 execute_batch_sql(sql_batches)
-                print(f"[Success] 股票行情主表批量写入完成，数据量：{len(temp_df)}")
+                print(f"[Success] 行业主表批量写入完成，数据量：{len(temp_df)}")
             except Exception as e:
-                print(f"[Critical] 股票行情主表批量写入失败: {str(e)}")
+                print(f"[Critical] 行业主表批量写入失败: {str(e)}")
         except Exception as e:
-            print(f"[Error] 股票主表写入失败: {e}")
+            print(f"[Error] 行业主表写入失败: {e}")
         #################################################
 
 
@@ -491,13 +491,13 @@ def industry_zh_a_spot_em() -> pd.DataFrame:
                 # 执行批量插入
                 execute_batch_sql(sql_batches)
                 
-                print(f"[Success] 股票基础信息表写入完成，数据量：{len(industry_info_df)}")
+                print(f"[Success] 行业基础信息表写入完成，数据量：{len(industry_info_df)}")
             except Exception as e:
-                print(f"[Critical] 股票基础表批量写入失败: {str(e)}")
+                print(f"[Critical] 行业基础表批量写入失败: {str(e)}")
 
             return temp_df
         except Exception as e:
-            print(f"[Error] 股票写入失败: {e}")
+            print(f"[Error] 行业基础表写入失败: {e}")
     except Exception as e:
         print(f"东方财富网-沪深京 A 股-实时行情处理失败: {e}")
         return pd.DataFrame()
@@ -713,7 +713,7 @@ def process_3day_data(
     # 第二步：执行分析查询
     query = f"""
     WITH LatestDate AS (
-        SELECT MAX(date_int) AS last_date 
+        SELECT MAX(date) AS last_date 
         FROM cn_industry_indicators
         WHERE name = "通用设备"
     ),
@@ -751,7 +751,11 @@ def process_3day_data(
             hist.turnover
         FROM cn_industry_indicators t
         JOIN cn_industry_hist_daily hist ON hist.name = t.name AND hist.date_int = t.date_int
-        WHERE t.date_int BETWEEN (SELECT last_date - 20 FROM LatestDate) AND (SELECT last_date FROM LatestDate)
+        WHERE t.date BETWEEN
+          (SELECT DATE_SUB(last_date, INTERVAL 10 DAY) FROM LatestDate) -- ✅ 起始日期 = last_date - 20天
+          AND
+          (SELECT last_date FROM LatestDate) -- ✅ 结束日期 = last_date
+
     )
     SELECT * FROM 3day
     WHERE kdjk_day2 IS NOT NULL
@@ -1872,7 +1876,7 @@ def main():
     start_time = time.time()
     try:
         # 行业历史数据
-        fetch_all_industry_hist()
+        # fetch_all_industry_hist()
 
         # 实时行业 OK
         industry_zh_a_spot_em()

@@ -12,7 +12,8 @@ import argparse
 import logging
 from datetime import datetime, timedelta
 import pandas as pd
-from sqlalchemy import text
+import sqlalchemy
+from sqlalchemy import MetaData, Table, text
 from tqdm import tqdm
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 import instock.lib.database as mdb
@@ -139,6 +140,10 @@ def get_market_sentiment_data():
                 wr_6, wr_6_day1, wr_6_day2,
                 cci, cci_day1, cci_day2
             FROM industry_3day_indicators
+          WHERE
+            (
+              str_to_date(`industry_3day_indicators`.`date_int`, '%Y%m%d') >= ((SELECT max(str_to_date(`industry_3day_indicators`.`date_int`, '%Y%m%d')) FROM `industry_3day_indicators`) - INTERVAL 1 MONTH)
+            )
         ),
         趋势判断 AS (
             SELECT 
@@ -275,32 +280,94 @@ def create_optimized_table():
             logging.error(f"创建表时发生错误: {e}")
             raise
 
-# 优化后的数据插入函数
+
+
 def optimized_data_insert(data):
     table_name = "industry_sentiment_a"
     try:
-        # 自定义插入方法，使用INSERT IGNORE避免重复
-        def insert_ignore(table, conn, keys, data_iter):
+        with mdb.engine().connect() as conn:
+            metadata = MetaData()
+            table = Table(table_name, metadata, autoload_with=conn.engine)
+            
+            # 调试：打印表结构
+            # print("\n[DEBUG] 表结构字段：")
+            # for col in table.columns:
+            #     print(f"{col.name}: {col.type}")
+                
+            unique_keys = {'date_int', '行业名称'}
+            update_columns = [
+                col.name for col in table.columns 
+                if col.name not in unique_keys 
+                and col.name != 'id'
+            ]
+            # print(f"\n[DEBUG] 将更新的字段：{update_columns}")
+
+            # 验证数据字段匹配
+            missing_columns = set(data.columns) - {col.name for col in table.columns}
+            if missing_columns:
+                raise ValueError(f"数据包含表中不存在的列: {missing_columns}")
+
+        def upsert_data(table, conn, keys, data_iter):
             from sqlalchemy.dialects.mysql import insert
+            
             data_rows = [dict(zip(keys, row)) for row in data_iter]
             if not data_rows:
                 return
-            stmt = insert(table.table).values(data_rows).prefix_with('IGNORE')
-            conn.execute(stmt)
-        
-        # 使用自定义方法插入数据
+                
+            stmt = insert(table.table).values(data_rows)
+            update_dict = {col: stmt.inserted[col] for col in update_columns}
+            
+            # 调试：打印生成的SQL
+            compiled_stmt = stmt.on_duplicate_key_update(**update_dict).compile(
+                compile_kwargs={"literal_binds": True}
+            )
+            # print(f"\n[DEBUG] 执行SQL:\n{compiled_stmt}")
+            
+            result = conn.execute(stmt.on_duplicate_key_update(**update_dict))
+            # print(f"[DEBUG] 影响行数: {result.rowcount}")
+
         data.to_sql(
             name=table_name,
             con=mdb.engine(),
             if_exists='append',
             index=False,
-            chunksize=500,
-            method=insert_ignore
+            chunksize=500,  # 减小chunksize便于调试
+            method=upsert_data
         )
-        logging.info("数据插入完成，重复记录已自动忽略")
+        # print("数据插入/更新成功")
+        logging.info("数据插入/更新成功")
+        
     except Exception as e:
-        logging.error(f"数据插入失败: {e}")
+        logging.error(f"操作失败，详细错误：{str(e)}", exc_info=True)
         raise
+
+
+# 优化后的数据插入函数
+# def optimized_data_insert(data):
+#     table_name = "industry_sentiment_a"
+#     try:
+#         # 自定义插入方法，使用INSERT IGNORE避免重复
+#         def insert_ignore(table, conn, keys, data_iter):
+#             from sqlalchemy.dialects.mysql import insert
+#             data_rows = [dict(zip(keys, row)) for row in data_iter]
+#             if not data_rows:
+#                 return
+#             stmt = insert(table.table).values(data_rows).prefix_with('IGNORE')
+#             conn.execute(stmt)
+        
+#         # 使用自定义方法插入数据
+#         data.to_sql(
+#             name=table_name,
+#             con=mdb.engine(),
+#             if_exists='append',
+#             index=False,
+#             chunksize=500,
+#             method=insert_ignore
+#         )
+#         logging.info("数据插入完成，重复记录已自动忽略")
+#     except Exception as e:
+#         logging.error(f"数据插入失败: {e}")
+#         raise
 
 
 
