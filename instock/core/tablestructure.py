@@ -573,6 +573,31 @@ TABLE_CN_STOCK_INDICATORS_BUY = {
 }
 
 
+TABLE_STRATEGY_STOCK_BUY_OPTIMIZATION = {
+    'name': 'strategy_stock_buy_optimization',
+    'cn': '股票精选买入',
+    'columns': {
+        'id': {'type': 'INT', 'cn': 'id', 'size': 0, 'en': 'id'},
+        'date': {'type': 'DATE', 'cn': '日期', 'size': 90},
+        'date_int': {'type': 'INT', 'cn': '日期_int', 'size': 90},
+        'code': {'type': f'VARCHAR(6) COLLATE {_COLLATE}', 'cn': '代码', 'size': 70},
+        'code_int': {'type': 'INT', 'cn': '代码_int', 'size': 70},
+        'name': {'type': f'VARCHAR(20) COLLATE {_COLLATE}', 'cn': '名称', 'size': 70},
+        'strategy': {'type': f'VARCHAR(50) COLLATE {_COLLATE}', 'cn': '策略标识', 'size': 90},
+        'close': {'type': 'FLOAT', 'cn': '价格', 'size': 70},
+        'kdjj': {'type': 'FLOAT', 'cn': '股票当天J值', 'size': 70},
+        'turnover': {'type': 'FLOAT', 'cn': '换手率', 'size': 70},
+        'jingliuru_cn': {'type': f'VARCHAR(50) COLLATE {_COLLATE}', 'cn': '净流入', 'size': 70},
+        'industry': {'type': f'VARCHAR(20) COLLATE {_COLLATE}', 'cn': '所属行业', 'size': 120, 'en': 'industry'},
+        'industry_kdj': {'type': f'VARCHAR(50) COLLATE {_COLLATE}', 'cn': '行业KDJ趋势', 'size': 70},
+        'industry_sentiment': {'type': f'VARCHAR(50) COLLATE {_COLLATE}', 'cn': '行业买卖情绪', 'size': 70},
+        'up_sentiment': {'type': 'INT', 'cn': '大盘上涨占比', 'size': 90},
+        'down_sentiment': {'type': 'INT', 'cn': '大盘下跌占比', 'size': 90},
+        # 合并动态生成的 rate 字段
+        **rate_columns  # 使用 ** 解包字典
+    }
+}
+
 
 
 
