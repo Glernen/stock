@@ -59,6 +59,31 @@ TABLE_CN_STOCK_INDICATORS_BUY = {
     }
 }
 
+TABLE_STRATEGY_STOCK_BUY_OPTIMIZATION = {
+    'name': 'strategy_stock_buy_optimization',
+    'columns': {
+        'date': {'type': DATE},
+        'date_int': {'type': INT},
+        'code': {'type': VARCHAR(6)},
+        'code_int': {'type': INT},
+        'name': {'type': VARCHAR(20)},
+        'strategy': {'type':VARCHAR(50) },
+        'close': {'type':FLOAT },
+        'kdjj': {'type':FLOAT },
+        'turnover': {'type':FLOAT },
+        'jingliuru_cn': {'type':VARCHAR(50) },
+        'industry': {'type':VARCHAR(50) },
+        'up_sentiment': {'type':INT },
+        'down_sentiment': {'type':INT },
+        'industry_kdjj': {'type':FLOAT },
+        'industry_kdjj_day1': {'type':FLOAT },
+        'industry_kdj': {'type':VARCHAR(50) },
+        'industry_wr': {'type':VARCHAR(50) },
+        'industry_cci': {'type':VARCHAR(50) },
+        'industry_sentiment': {'type':VARCHAR(50) },
+        **{f'rate_{i}': {'type': FLOAT} for i in range(1, RATE_FIELDS_COUNT+1)}
+    }
+}
 
 
 TABLE_CN_STOCK_INDICATORS_SELL = {
@@ -123,7 +148,7 @@ class StockHistData:
 
 def prepare():
     # tables = [TABLE_CN_STOCK_INDICATORS_BUY, TABLE_CN_STOCK_INDICATORS_SELL]
-    tables = [TABLE_CN_STOCK_INDICATORS_BUY]
+    tables = [TABLE_CN_STOCK_INDICATORS_BUY,TABLE_STRATEGY_STOCK_BUY_OPTIMIZATION]
     
     # 获取历史数据
     hist_data = StockHistData().get_recent_data()

@@ -48,9 +48,10 @@ buy_all AS (
         CAST(COUNT(*) OVER (PARTITION BY csi.`industry`) * 100.0 / COUNT(*) OVER () AS FLOAT) AS `入选股的行业占比`
     FROM 
         `cn_stock_indicators_buy` csi
-    JOIN latest_date ON csi.`date_int` = latest_date.latest_date_int
+    -- JOIN latest_date ON csi.`date_int` = latest_date.latest_date_int
     WHERE 
-        csi.`rate_60` IS NULL 
+        csi.`date_int` = (SELECT latest_date_int FROM latest_date)
+        AND csi.`rate_60` IS NULL 
         -- AND csi.`date_int` = 20250409
         AND csi.`strategy` = 'strategy_a' 
         -- AND csi.`industry_kdj` = '上涨趋势' 
@@ -117,9 +118,10 @@ buy_all AS (
         CAST(COUNT(*) OVER (PARTITION BY csi.`industry`) * 100.0 / COUNT(*) OVER () AS FLOAT) AS `入选股的行业占比`
     FROM 
         `cn_stock_indicators_buy` csi
-    JOIN latest_date ON csi.`date_int` = latest_date.latest_date_int
+    -- JOIN latest_date ON csi.`date_int` = latest_date.latest_date_int
     WHERE 
-        csi.`rate_60` IS NULL 
+        csi.`date_int` = (SELECT latest_date_int FROM latest_date)
+        AND csi.`rate_60` IS NULL 
         -- AND csi.`date_int` = 20250409
         AND csi.`strategy` = 'strategy_b' 
         -- AND csi.`industry_kdj` = '上涨趋势' 
