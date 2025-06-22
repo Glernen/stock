@@ -10,7 +10,8 @@ sys.path.append(cpath)
 
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, INT, DATETIME
 from sqlalchemy.dialects.mysql import TINYINT
-import talib as tl
+import ta as tl
+# import talib as tl
 from instock.core.strategy import enter
 from instock.core.strategy import turtle_trade
 from instock.core.strategy import climax_limitdown
@@ -729,7 +730,7 @@ TABLE_CN_STOCK_STRATEGIES = [
     {'name': 'cn_stock_strategy_low_atr', 'cn': '低ATR成长', 'size': 70, 'func': low_atr.check_low_increase,
      'columns': _tmp_columns}
 ]
-
+'''
 STOCK_KLINE_PATTERN_DATA = {'name': 'cn_stock_pattern_recognitions', 'cn': 'K线形态',
                             'columns': {
                                 'tow_crows': {'type': INT, 'cn': '两只乌鸦', 'size': 70, 'func': tl.CDL2CROWS},
@@ -851,6 +852,7 @@ STOCK_KLINE_PATTERN_DATA = {'name': 'cn_stock_pattern_recognitions', 'cn': 'K线
 TABLE_CN_STOCK_KLINE_PATTERN = {'name': 'cn_stock_pattern', 'cn': '股票K线形态',
                                 'columns': TABLE_CN_STOCK_FOREIGN_KEY['columns'].copy()}
 TABLE_CN_STOCK_KLINE_PATTERN['columns'].update(STOCK_KLINE_PATTERN_DATA['columns'])
+'''
 
 TABLE_CN_STOCK_SELECTION = {'name': 'cn_stock_selection', 'cn': '综合选股',
                             'columns': {'date': {'type': DATE, 'cn': '日期', 'size': 0, 'map': 'MAX_TRADE_DATE', 'en': 'date'},
@@ -1175,7 +1177,7 @@ TABLE_REGISTRY = {
     'cn_stock_attention': TABLE_CN_STOCK_ATTENTION,
     'cn_stock_bonus': TABLE_CN_STOCK_BONUS,
     'cn_stock_blocktrade': TABLE_CN_STOCK_BLOCKTRADE,
-    'cn_stock_pattern': TABLE_CN_STOCK_KLINE_PATTERN,
+    # 'cn_stock_pattern': TABLE_CN_STOCK_KLINE_PATTERN,
     'cn_stock_cpbd': CN_STOCK_CPBD
 }
 

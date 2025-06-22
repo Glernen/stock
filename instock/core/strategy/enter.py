@@ -2,7 +2,9 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-import talib as tl
+# import talib as tl
+
+import ta as tl
 
 
 __author__ = 'myh '

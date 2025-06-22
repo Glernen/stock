@@ -8,9 +8,6 @@ cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
 
-# print(f"Current working directory: {os.getcwd()}")
-# print(f"Project path added to sys.path: {cpath}")
-
 import json
 import math
 import requests
@@ -27,8 +24,7 @@ from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-from instock.lib.database import db_host, db_user, db_password, db_database, db_charset, db_port
-from concurrent.futures import ThreadPoolExecutor
+from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
 
 
 
@@ -496,6 +492,95 @@ def fetch_zh_a_spot_data(
                 data.extend(page_data)
 
     return pd.DataFrame(data)
+
+
+
+########################################
+#腾讯接口获取股票实时数据并写入数据库
+
+def fetch_tencent_stock_data(offset=0, count=200):
+    """获取单页股票数据"""
+    url = "https://proxy.finance.qq.com/cgi/cgi-bin/rank/hs/getBoardRankList"
+    params = {
+        "_appver": "11.17.0",
+        "board_code": "aStock",
+        "sort_type": "price",
+        "direct": "down",
+        "offset": offset,
+        "count": count
+    }
+    try:
+        response = requests.get(url, params=params)
+        if response.status_code == 200:
+            data = response.json()
+            if data['code'] == 0:
+                return data['data']['rank_list'], data['data']['total']
+        return [], 0
+    except Exception as e:
+        print(f"请求失败: {e}")
+        return [], 0
+
+
+def get_tencent_all_stocks():
+    """获取所有股票数据"""
+    all_stocks = []
+    count = 200  # 每页固定200条
+    first_page_data, total = fetch_tencent_stock_data(offset=0, count=count)
+    all_stocks.extend(first_page_data)
+
+    if total > count:
+        total_pages = (total + count - 1) // count  # 计算总页数
+        for page in tqdm(range(1, total_pages), desc="获取股票数据进度"):
+            offset = page * count
+            page_data, _ = fetch_tencent_stock_data(offset=offset, count=count)
+            all_stocks.extend(page_data)
+
+    # 创建DataFrame
+    df = pd.DataFrame(all_stocks)
+
+    # 获取上证交易所日历
+    sh_cal = mcal.get_calendar('SSE')
+    latest_trade_date = sh_cal.schedule(start_date='2020-01-01', end_date=pd.Timestamp.today()).index[-1].strftime(
+        "%Y-%m-%d")
+    df.loc[:, "date"] = latest_trade_date
+
+    # 中文字段名映射
+    column_mapping = {
+        'date': '日期',
+        'code': '股票代码',
+        'hsl': '换手率',
+        'lb': '量比',
+        'ltsz': '流通市值', # (亿元)
+        'name': '股票名称',
+        'pe_ttm': '动态市盈率',
+        'pn': '市净率',
+        'speed': '涨速', # (每分钟)
+        'state': '状态',
+        'stock_type': '股票类型',
+        'turnover': '成交额', # (万元)
+        'volume': '成交量', # (手)
+        'zd': '涨跌额',
+        'zdf': '涨跌幅',
+        'zdf_d10': '10日涨跌幅',
+        'zdf_d20': '20日涨跌幅',
+        'zdf_d5': '5日涨跌幅',
+        'zdf_d60': '60日涨跌幅',
+        'zdf_w52': '52周涨跌幅',
+        'zdf_y': '年初至今涨跌幅',
+        'zf': '振幅',
+        'zljlr': '主力净流入', # (万元)
+        'zllc': '主力流出', # (万元)
+        'zllc_d5': '5日主力流出', # (万元)
+        'zllr': '主力流入', # (万元)
+        'zllr_d5': '5日主力流入', # (万元)
+        'zsz': '总市值',
+        'zxj': '最新价'
+    }
+
+    # 重命名列
+    df = df.rename(columns=column_mapping)
+
+    return df
 
 
 ########################################
@@ -1366,7 +1451,6 @@ class DBManager:
             connection = mysql.connector.connect(
                 host=db_host,
                 user=db_user,
-                port=db_port,
                 password=db_password,
                 database=db_database,
                 charset=db_charset
@@ -1700,42 +1784,24 @@ def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=500):
             connection.close()
             print("数据库连接已安全关闭")  # 调试日志
 
-# def main():
-#     # 最新选股器，沪深全数据 OK
-#     stock_selection()
-#
-#     # 实时股票 OK
-#     stock_zh_a_spot_em()
-#
-#     # 实时ETF基金 OK
-#     etf_spot_em()
-#
-#     # 实时指数 OK
-#     index_zh_a_spot_em()
-#
-#     # 实时行业
-#     industry_zh_a_spot_em()
-#
-#
-
 def main():
+    # 最新选股器，沪深全数据 OK
+    stock_selection()
 
-    # 定义要并行执行的函数列表
-    functions_to_execute = [
-        stock_selection,
-        stock_zh_a_spot_em,
-        etf_spot_em,
-        index_zh_a_spot_em,
-        industry_zh_a_spot_em
-    ]
+    # 实时股票 OK
+    # stock_zh_a_spot_em()
 
-    # 使用线程池并行执行
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(func) for func in functions_to_execute]
+    # 实时ETF基金 OK
+    etf_spot_em()
 
-        # 等待所有任务完成（可选）
-        for future in futures:
-            future.result()  # 这里会抛出任何执行中出现的异常
+    # 实时指数 OK
+    index_zh_a_spot_em()
+
+    # 实时行业
+    industry_zh_a_spot_em()
+
+
+
 
 # main函数入口
 if __name__ == '__main__':

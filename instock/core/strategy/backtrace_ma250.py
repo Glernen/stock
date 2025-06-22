@@ -2,7 +2,8 @@
 # -*- coding: utf-8 -*-
 
 import numpy as np
-import talib as tl
+import ta as tl
+# import talib as tl
 from datetime import datetime, timedelta
 
 __author__ = 'myh '

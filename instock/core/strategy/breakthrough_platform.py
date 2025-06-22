@@ -3,7 +3,8 @@
 
 from datetime import datetime
 import numpy as np
-import talib as tl
+import ta as tl
+# import talib as tl
 from instock.core.strategy import enter
 
 __author__ = 'myh '
