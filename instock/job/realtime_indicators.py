@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 # 
 ''' 
-2025年6月21日 
+2025年6月21日  1400.72秒 (23分)
 1、只计算KDJ，BOLL，WR，CCI，OBV数据；
 2、去除CCI84为空的数据(该计算值至少需要84个交易日的数据)；
 3、计算窗口值 MAX_HISTORY_WINDOW 改为 60
@@ -31,7 +31,8 @@ from mysql.connector import Error
 # from instock.lib.database import DBManager
 import sqlalchemy
 import time
-import instock.core.tablestructure as tbs
+import psutil
+from functools import lru_cache
 from instock.lib.database import db_host, db_user, db_password, db_database, db_charset
 
 
@@ -592,7 +593,7 @@ def sync_table_structure(table_name: str, data_columns: List[str]):
                         `name` VARCHAR(20),
                         INDEX `idx_date_int` (`date_int`),
                         INDEX `idx_code_int` (`code_int`),
-                        INDEX `idx_unique_int` (`code_int`,`date_int`)
+                        UNIQUE INDEX `idx_unique_int` (`code_int`,`date_int`)
                     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
                 """
                 cursor.execute(create_sql)
@@ -737,107 +738,226 @@ def process_single_code(
         return pd.DataFrame()
 
 
+# 优化1: 内存友好的分批处理
+def process_data_type(data_type: str):
+    """处理单一数据类型（股票/ETF/指数）"""
+    print(f"开始处理 {data_type}")
+    start_time = time.time()
+    codes = get_latest_codes(data_type)
+    total_codes = len(codes)
+    print(f"共 {total_codes} 个代码需要处理")
+
+    # 根据内存大小动态调整批次大小
+    mem = psutil.virtual_memory()
+    available_mem_gb = mem.available / (1024 ** 3)
+    batch_size = max(50, min(200, int(available_mem_gb * 10)))  # 每GB内存处理10个代码
+
+    # 使用线程池（线程数 = CPU核心数 * 2）
+    max_workers = min(8, max(4, os.cpu_count() * 2))
+    processed = 0
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = {}
+
+        # 分批提交任务
+        for i in range(0, total_codes, batch_size):
+            batch_codes = codes[i:i + batch_size]
+            futures[executor.submit(process_batch, batch_codes, data_type)] = batch_codes
+
+        # 处理完成的任务
+        for future in as_completed(futures):
+            batch_codes = futures[future]
+            try:
+                result = future.result()
+                if not result.empty:
+                    sync_and_save(INDICATOR_TABLES[data_type], result)
+                    processed += len(result)
+                    print(f"已保存 {len(result)} 条记录 | 进度: {min(i + batch_size, total_codes)}/{total_codes}")
+                else:
+                    print(f"批次无新数据 | 进度: {min(i + batch_size, total_codes)}/{total_codes}")
+            except Exception as e:
+                print(f"处理批次失败: {str(e)}")
+
+    print(f"{data_type} 处理完成! 耗时: {time.time() - start_time:.2f}秒, 处理记录: {processed}")
+    return processed
+
+
+# 优化2: 高效处理批次
+def process_batch(batch_codes: List[int], data_type: str) -> pd.DataFrame:
+    """处理一批股票代码"""
+    # 1. 获取历史数据（只取必要字段）
+    hist_data = get_hist_data_batch(batch_codes, data_type)
+    if hist_data.empty:
+        return pd.DataFrame()
+
+    # 2. 批量计算指标
+    indicators = calculate_indicators_batch(hist_data)
+    if indicators.empty:
+        return pd.DataFrame()
+
+    # 3. 过滤已处理数据
+    table_name = INDICATOR_TABLES[data_type]
+    unique_codes = indicators['code_int'].unique().tolist()
+    last_dates_map = get_last_processed_dates_batch(table_name, unique_codes)
+
+    results = []
+    for code in unique_codes:
+        code_indicators = indicators[indicators['code_int'] == code]
+        last_date = last_dates_map.get(code, None)
+        if last_date:
+            # 只保留大于最后日期的数据
+            code_indicators = code_indicators[code_indicators['date'] > last_date]
+        results.append(code_indicators)
+
+    return pd.concat(results, ignore_index=True) if results else pd.DataFrame()
+
+
+# 优化3: 精简历史数据查询
+def get_hist_data_batch(batch_codes: List[int], data_type: str) -> pd.DataFrame:
+    """只获取必需的字段并限制数据量"""
+    if not batch_codes:
+        return pd.DataFrame()
+
+    try:
+        with DBManager.get_new_connection() as conn:
+            code_list = ",".join(map(str, batch_codes))
+
+            # 只查询必需的字段
+            query = f"""
+                SELECT date, date_int, code, code_int, open, close, high, low, volume
+                FROM {TABLE_MAP[data_type]['hist_table']}
+                WHERE code_int IN ({code_list})
+                  AND date >= CURDATE() - INTERVAL {MAX_HISTORY_WINDOW} DAY
+                ORDER BY code_int, date ASC 
+            """
+            return pd.read_sql(query, conn)
+    except Exception as e:
+        print(f"获取批次数据失败：{str(e)}")
+        return pd.DataFrame()
+
+
+# 优化4: 高效批量指标计算
+def calculate_indicators_batch(batch_data: pd.DataFrame) -> pd.DataFrame:
+    """批量计算指标 - 减少函数调用开销"""
+    if batch_data.empty:
+        return pd.DataFrame()
+
+    # 预处理数据
+    batch_data = batch_data.sort_values(by='date', ascending=True)
+    results = []
+
+    # 按股票分组处理
+    grouped = batch_data.groupby('code_int')
+    for code, group in grouped:
+        if len(group) < 34:  # 最小数据量要求
+            continue
+
+        try:
+            # 计算指标
+            indicators = pd.DataFrame()
+            indicators['date'] = group['date']
+            indicators['code_int'] = code
+            indicators['close'] = group['close']
+
+            # 1. 计算KDJ
+            stoch = ta.momentum.StochasticOscillator(
+                high=group['high'], low=group['low'], close=group['close'],
+                window=9, smooth_window=5
+            )
+            indicators['kdjk'] = stoch.stoch()
+            indicators['kdjd'] = stoch.stoch_signal()
+            indicators['kdjj'] = 3 * indicators['kdjk'] - 2 * indicators['kdjd']
+
+            # 2. 计算BOLL
+            boll = ta.volatility.BollingerBands(close=group['close'], window=20, window_dev=2)
+            indicators['boll_ub'] = boll.bollinger_hband()
+            indicators['boll'] = boll.bollinger_mavg()
+            indicators['boll_lb'] = boll.bollinger_lband()
+
+            # 3. 计算WR (只计算WR6)
+            indicators['wr_6'] = ta.momentum.WilliamsRIndicator(
+                high=group['high'], low=group['low'], close=group['close'], lbp=6
+            ).williams_r()
+
+            # 4. 计算CCI
+            indicators['cci'] = ta.trend.CCIIndicator(
+                high=group['high'], low=group['low'], close=group['close'], window=20
+            ).cci()
+
+            # 5. 计算OBV
+            indicators['obv'] = ta.volume.OnBalanceVolumeIndicator(
+                close=group['close'], volume=group['volume']
+            ).on_balance_volume()
+
+            results.append(indicators)
+        except Exception as e:
+            print(f"计算指标失败 {code}: {str(e)}")
+
+    return pd.concat(results, ignore_index=True) if results else pd.DataFrame()
+
+
+# 优化5: 数据库写入优化
+def sync_and_save(table_name: str, data: pd.DataFrame):
+    """高效保存数据到数据库"""
+    if data.empty:
+        return
+
+    try:
+        # 使用SQLAlchemy进行批量插入
+        engine = sqlalchemy.create_engine(
+            f"mysql+mysqlconnector://{db_user}:{db_password}@{db_host}/{db_database}?charset={db_charset}"
+        )
+
+        # 分批写入，每批1000条
+        chunks = [data[i:i + 1000] for i in range(0, len(data), 1000)]
+
+        for chunk in chunks:
+            chunk.to_sql(
+                name=table_name,
+                con=engine,
+                if_exists='append',
+                index=False,
+                method='multi',
+                chunksize=500
+            )
+        print(f"成功保存 {len(data)} 条记录到 {table_name}")
+    except Exception as e:
+        print(f"保存数据失败: {str(e)}")
+        # 回退到原始方法
+        sql_txt = sql语句生成器(table_name, data)
+        execute_raw_sql(sql_txt)
+
+
+# 优化6: 内存监控与优化
+def memory_guard():
+    """内存保护机制，防止OOM"""
+    mem = psutil.virtual_memory()
+    if mem.percent > 85:
+        print(f"⚠️ 内存使用过高: {mem.percent}%, 暂停处理")
+        time.sleep(10)
+    return mem.percent
+
+
 def main():
     start_time = time.time()
+    total_processed = 0
+
     try:
-        '''
-        # 检查是否为首次运行（任一指标表无数据）
-        is_first_run = check_if_first_run()
+        # 处理顺序：ETF -> 指数 -> 股票（从简单到复杂）
+        for data_type in ['etf', 'index', 'stock']:
+            # 内存检查
+            if memory_guard() > 90:
+                print("内存不足，终止处理")
+                break
 
-        # 首次运行时动态同步表结构
-        if is_first_run:
-            # 定义每个类型的示例code_int
-            sample_codes = {
-                'stock': 1,      # 假设code_int=1为有效股票
-                'etf': 159001,   # 假设code_int=159001为有效ETF
-                'index': 1       # 假设code_int=1为有效指数
-            }
-
-            for data_type in ['stock', 'etf', 'index']:
-                table_name = INDICATOR_TABLES[data_type]
-                code_int = sample_codes[data_type]
-
-                # create_table_if_not_exists(table_name)  # 确保只执行一次
-
-                # 1. 获取足够的历史数据（至少34条）
-                # 获取历史数据（直接传递整数）
-                hist_data = get_hist_data(code_int, data_type, last_date=None)
-                if len(hist_data) < 34:
-                    print(f"错误：{data_type}示例数据不足34条（当前{len(hist_data)}条），无法同步结构！")
-                    sys.exit(1)
-
-                # 2. 计算指标，获取所有字段
-                indicators = calculate_indicators(hist_data)
-                if indicators.empty:
-                    print(f"错误：{data_type}指标计算失败！")
-                    sys.exit(1)
-
-                # 3. 动态同步表结构（基于实际字段）
-                sync_table_structure(table_name, indicators.columns)
-
-            print("首次运行表结构同步完成")
-        '''
-
-
-
-        batch_size = 500
-        max_workers = 10
-
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        # with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for data_type in ['etf', 'index', 'stock']:
-                codes = get_latest_codes(data_type)
-                print(f"开始处理 {data_type} 共 {len(codes)} 个代码")
-
-                for batch_idx in range(0, len(codes), batch_size):
-                    batch_codes = codes[batch_idx:batch_idx + batch_size]
-                    print(f"处理批次 {batch_idx//batch_size+1}，代码数：{len(batch_codes)}")
-
-                    # 1. 获取本批次历史数据
-                    batch_data = get_hist_data_batch(batch_codes, data_type)
-                    if batch_data.empty:
-                        print(f"批次 {batch_idx//batch_size+1} 无数据，跳过")
-                        continue
-
-                    # 2. 批量获取最后处理日期（关键修改点）
-                    # 从本批数据中提取所有唯一代码
-                    unique_codes_in_batch = batch_data['code_int'].unique().tolist()
-                    last_dates_map = get_last_processed_dates_batch(
-                        INDICATOR_TABLES[data_type],
-                        unique_codes_in_batch
-                    )
-
-                    # 3. 并行处理本批次代码
-                    futures = []
-                    for code in batch_codes:
-                        # 从批次数据中提取单个代码数据
-                        code_data = batch_data[batch_data['code_int'] == code].copy()
-                        if code_data.empty:
-                            continue
-                        # 提交任务时传入预取的最后处理日期
-                        futures.append(executor.submit(
-                            process_single_code,
-                            code=code,
-                            data_type=data_type,
-                            code_data=code_data,
-                            last_processed_date=last_dates_map.get(code, None)
-                        ))
-
-                    # 4. 合并并提交本批次结果
-                    valid_dfs = []
-                    for future in as_completed(futures):
-                        df = future.result()
-                        if df is not None and not df.empty:
-                            valid_dfs.append(df)
-
-                    if valid_dfs:
-                        combined_data = pd.concat(valid_dfs, ignore_index=True)
-                        sync_and_save(INDICATOR_TABLES[data_type], combined_data)
-                        print(f"批次提交成功，记录数：{len(combined_data)}")
-                    else:
-                        print(f"本批次无有效数据")
+            processed = process_data_type(data_type)
+            total_processed += processed
     finally:
-        print(f"\n🕒 总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
+        total_time = time.time() - start_time
+        print(f"\n✅ 处理完成! 总耗时: {total_time:.2f}秒")
+        print(f"总处理记录: {total_processed}")
+        print(f"平均速度: {total_processed / max(1, total_time):.2f} 条/秒")
+
 
 if __name__ == "__main__":
     main()

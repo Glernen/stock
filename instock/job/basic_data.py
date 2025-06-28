@@ -1700,61 +1700,44 @@ def execute_raw_sql(sql, params=None, max_query_size=1024*1024, batch_size=500):
             connection.close()
             print("数据库连接已安全关闭")  # 调试日志
 
-# def main():
-#     # 最新选股器，沪深全数据 OK
-#     stock_selection()
-#
-#     # 实时股票 OK
-#     stock_zh_a_spot_em()
-#
-#     # 实时ETF基金 OK
-#     etf_spot_em()
-#
-#     # 实时指数 OK
-#     index_zh_a_spot_em()
-#
-#     # 实时行业
-#     industry_zh_a_spot_em()
-#
-#
-
 def main():
+    # 最新选股器，沪深全数据 OK
+    stock_selection()
 
-    # 定义要并行执行的函数列表
-    functions_to_execute = [
-        stock_selection,
-        stock_zh_a_spot_em,
-        etf_spot_em,
-        index_zh_a_spot_em,
-        industry_zh_a_spot_em
-    ]
+    # 实时股票 OK
+    stock_zh_a_spot_em()
 
-    # 使用线程池并行执行
-    with ThreadPoolExecutor(max_workers=5) as executor:
-        futures = [executor.submit(func) for func in functions_to_execute]
+    # 实时ETF基金 OK
+    etf_spot_em()
 
-        # 等待所有任务完成（可选）
-        for future in futures:
-            future.result()  # 这里会抛出任何执行中出现的异常
+    # 实时指数 OK
+    index_zh_a_spot_em()
+
+    # 实时行业
+    industry_zh_a_spot_em()
+#
+#
+#
+# def main():
+#
+#     # 定义要并行执行的函数列表
+#     functions_to_execute = [
+#         stock_selection,
+#         stock_zh_a_spot_em,
+#         etf_spot_em,
+#         index_zh_a_spot_em,
+#         industry_zh_a_spot_em
+#     ]
+#
+#     # 使用线程池并行执行
+#     with ThreadPoolExecutor(max_workers=5) as executor:
+#         futures = [executor.submit(func) for func in functions_to_execute]
+#
+#         # 等待所有任务完成（可选）
+#         for future in futures:
+#             future.result()  # 这里会抛出任何执行中出现的异常
 
 # main函数入口
 if __name__ == '__main__':
     main()
 
-    # 最新选股器，沪深全数据 OK
-    # stock_selection()
-
-    # 实时股票 OK
-    # stock_zh_a_spot_em()
-
-    # 实时ETF基金 OK
-    # etf_spot_em()
-
-    # 实时指数 OK
-    # index_zh_a_spot_em()
-
-    # 历史日周月股票 OK
-    # fetch_all_stock_hist()
-    
-    # th = fetch_stocks_trade_date().get_data()
-    # print(f'{th}')

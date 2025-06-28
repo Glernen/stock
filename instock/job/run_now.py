@@ -34,7 +34,7 @@ import industry_sentiment_a as industry_sentiment_a
 import indicators_strategy_buy as indicators_strategy_buy
 import buy_20250425 as buy_20250425
 import basic_data as basic_data
-import indicators_now as indicators_now
+import realtime_indicators as indicators_now
 
 numeric_cols = ["f2", "f3", "f4", "f5", "f6", "f7", "f8", "f10", "f15", "f16", "f17", "f18", "f22", "f11", "f24", "f25", "f9", "f115", "f114", "f23", "f112", "f113", "f61", "f48", "f37", "f49", "f57", "f40", "f41", "f45", "f46", "f38", "f39", "f20", "f21" ]
 date_cols = ["f26", "f221"]
