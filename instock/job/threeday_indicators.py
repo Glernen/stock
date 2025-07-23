@@ -238,16 +238,16 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
     join_clause = ""
     if "stock" in source_table:
         join_clause = f"""
-        JOIN cn_stock_info s ON s.code_int = t.code_int
-        JOIN cn_stock_hist_daily hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int
+        JOIN basic_info_stock s ON s.code_int = t.code_int
+        JOIN kline_stock hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int
         """
     elif "etf" in source_table:
-        join_clause = "JOIN cn_etf_hist_daily hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int"
+        join_clause = "JOIN kline_etf hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int"
     elif "index" in source_table:
-        join_clause = "JOIN cn_index_hist_daily hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int"
+        join_clause = "JOIN kline_index hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int"
 
     # 根据源表类型选择字段
-    industry_field = "s.industry," if "stock" in source_table else "NULL AS industry,"
+    industry_field = "s.`东方财富网行业 AS industry`," if "stock" in source_table else "NULL AS industry,"
     
     # 第二步：执行分析查询
     query = f"""
@@ -289,7 +289,7 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
             LAG(t.cci, 1) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS cci_day1,
             LAG(t.cci, 2) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS cci_day2,
             {industry_field}
-            hist.turnover
+            hist.turnoverrate AS turnover
         FROM {source_table} t
         {join_clause}
         WHERE t.date BETWEEN

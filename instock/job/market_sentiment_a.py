@@ -50,7 +50,7 @@ def get_market_sentiment_data():
             `index_3day_indicators`
           WHERE
             (
-              (`index_3day_indicators`.`code_int` IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050))
+              (`index_3day_indicators`.`code_int` IN (1, 9, 11, 300, 510, 399001, 399006, 399293, 852,399106))
               AND (`index_3day_indicators`.`kdjk` >= `index_3day_indicators`.`kdjk_day1`)
               AND (`index_3day_indicators`.`kdjd` >= `index_3day_indicators`.`kdjd_day1`)
               AND (`index_3day_indicators`.`wr_6` >= `index_3day_indicators`.`wr_6_day1`)
@@ -70,7 +70,7 @@ def get_market_sentiment_data():
             `index_3day_indicators`
           WHERE
             (
-              (`index_3day_indicators`.`code_int` IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050))
+              (`index_3day_indicators`.`code_int` IN (1, 9, 11, 300, 510, 399001, 399006, 399293, 852,399106))
               AND (`index_3day_indicators`.`kdjk` <= `index_3day_indicators`.`kdjk_day1`)
               AND (`index_3day_indicators`.`kdjd` <= `index_3day_indicators`.`kdjd_day1`)
               AND (`index_3day_indicators`.`wr_6` <= `index_3day_indicators`.`wr_6_day1`)
@@ -118,7 +118,7 @@ def get_market_sentiment_data():
           FROM
             `index_3day_indicators`
           WHERE
-            (`index_3day_indicators`.`code_int` IN (1, 300, 510, 399001, 399006, 399293, 688, 852, 932000, 899050))
+            (`index_3day_indicators`.`code_int` IN (1, 9, 11, 300, 510, 399001, 399006, 399293, 852,399106))
           GROUP BY
             `index_3day_indicators`.`date_int`
         ),

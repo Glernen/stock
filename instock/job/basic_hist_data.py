@@ -14,7 +14,7 @@ import requests
 import numpy as np
 import pandas as pd
 import time
-import datetime 
+import datetime
 import mysql.connector
 import instock.lib.database as mdb
 import pandas_market_calendars as mcal
@@ -24,7 +24,7 @@ from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
+from instock.lib.database import db_host, db_user, db_password, db_database, db_charset
 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
@@ -52,17 +52,17 @@ BASE_COLUMNS = {
                 'name': {'type': VARCHAR(20), 'cn': '名称', 'size': 120, 'en': 'name'},
                 'code': {'type': VARCHAR(6), 'cn': '代码', 'size': 70, 'en': 'code'},
                 'code_int': {'type': INT, 'cn': '代码', 'size': 70,'map': None, 'en': 'code_int'},
-                'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  
-                'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},  
-                'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70}, 
-                'low':     {'type': FLOAT, 'cn': '最低价', 'en': 'low', 'map': 4, 'size': 70},    
-                'volume':  {'type': FLOAT, 'cn': '成交量', 'en': 'volume', 'map': 5, 'size': 120},  
-                'amount':  {'type': FLOAT, 'cn': '成交额', 'en': 'amount', 'map': 6, 'size': 120}, 
-                'amplitude': {'type': FLOAT, 'cn': '振幅', 'en': 'amplitude', 'map': 7, 'size': 120},  
-                'quote_change': {'type': FLOAT, 'cn': '涨跌幅', 'en': 'quote_change', 'map': 8, 'size': 120},  
-                'ups_downs': {'type': FLOAT, 'cn': '涨跌额', 'en': 'ups_downs', 'map': 9, 'size': 120},  
+                'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},
+                'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},
+                'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70},
+                'low':     {'type': FLOAT, 'cn': '最低价', 'en': 'low', 'map': 4, 'size': 70},
+                'volume':  {'type': FLOAT, 'cn': '成交量', 'en': 'volume', 'map': 5, 'size': 120},
+                'amount':  {'type': FLOAT, 'cn': '成交额', 'en': 'amount', 'map': 6, 'size': 120},
+                'amplitude': {'type': FLOAT, 'cn': '振幅', 'en': 'amplitude', 'map': 7, 'size': 120},
+                'quote_change': {'type': FLOAT, 'cn': '涨跌幅', 'en': 'quote_change', 'map': 8, 'size': 120},
+                'ups_downs': {'type': FLOAT, 'cn': '涨跌额', 'en': 'ups_downs', 'map': 9, 'size': 120},
                 'turnover': {'type': FLOAT, 'cn': '换手率', 'en': 'turnover', 'map': 10, 'size': 120} ,
-                'period': {'type': VARCHAR(20),'cn': '周期','en': 'period', 'size': 120} 
+                'period': {'type': VARCHAR(20),'cn': '周期','en': 'period', 'size': 120}
     }
 
 def create_hist_data(asset_type: str, freq: str, cn_desc: str) -> dict:
@@ -168,61 +168,44 @@ def fetch_all_stock_hist(beg: str = None, end: str = None):
     # 创建表
     for table_config in [
         CN_STOCK_HIST_DAILY_DATA,
-        # CN_STOCK_HIST_WEEKLY_DATA,
-        # CN_STOCK_HIST_MONTHLY_DATA
     ]:
         create_table_if_not_exists(table_config['name'])
 
     # 获取股票列表
     conn = DBManager.get_new_connection()
-    stock_df = pd.read_sql("SELECT code, market_id, name FROM cn_stock_info WHERE date = (SELECT MAX(date) FROM cn_stock_info WHERE code_int = 1 ) AND market_id IS NOT NULL", conn)
+    stock_df = pd.read_sql(
+        "SELECT code, market_id, name FROM cn_stock_info WHERE date = (SELECT MAX(date) FROM cn_stock_info WHERE code_int = 1 ) AND market_id IS NOT NULL",
+        conn)
     conn.close()
 
     # 新增过滤逻辑：只保留目标股票
-    stock_df = stock_df[stock_df['code'].apply(is_a_stock)]  # <-- 关键修改位置
+    stock_df = stock_df[stock_df['code'].apply(is_a_stock)]
     print(f"待采集股票数量：{len(stock_df)}")
 
     # 准备数据容器
     daily_data = pd.DataFrame()
-    # weekly_data = pd.DataFrame()
-    # monthly_data = pd.DataFrame()
 
-    # 多线程获取数据
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        futures = []
-        for _, row in stock_df.iterrows():
-            code = row['code']
-            market_id = row['market_id']
-            name = row['name']
-            # for period in ["daily", "weekly", "monthly"]:
-            for period in ["daily"]:
-                futures.append(
-                    executor.submit(
-                        fetch_single_hist,
-                        code, market_id, period, name, "stock", beg, end
-                    )
-                )
+    # 单线程获取数据（替换多线程）
+    for _, row in tqdm(stock_df.iterrows(), total=len(stock_df), desc="获取股票历史数据"):
+        code = row['code']
+        market_id = row['market_id']
+        name = row['name']
+        period = "daily"
 
-        # 合并数据
-        for future in tqdm(as_completed(futures), total=len(futures), desc="获取股票历史数据"):
-            data = future.result()
-            if data is None:
-                continue
-            df = data['df']
-            if data['period'] == 'daily':
-                daily_data = pd.concat([daily_data, df], ignore_index=True)
-            # elif data['period'] == 'weekly':
-            #     weekly_data = pd.concat([weekly_data, df], ignore_index=True)
-            # elif data['period'] == 'monthly':
-            #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
+        data = fetch_single_hist(code, market_id, period, name, "stock", beg, end)
+        if data is None:
+            continue
 
+        df = data['df']
+        if data['period'] == 'daily':
+            daily_data = pd.concat([daily_data, df], ignore_index=True)
+
+        # 添加延时
+        time.sleep(0.5)  # 每次请求后延时0.5秒
 
     sync_and_write(CN_STOCK_HIST_DAILY_DATA['name'], daily_data)
-    # sync_and_write(CN_STOCK_HIST_WEEKLY_DATA['name'], weekly_data)
-    # sync_and_write(CN_STOCK_HIST_MONTHLY_DATA['name'], monthly_data)
-    
-    # print(f"[Success] 股票历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
     print(f"[Success] 股票历史数据写入完成（日：{len(daily_data)}）")
+
 
 ########################################
 #获取ETF基金历史数据并写入数据库
@@ -248,44 +231,26 @@ def fetch_all_etf_hist(beg: str = None, end: str = None):
 
     # 准备数据容器
     daily_data = pd.DataFrame()
-    # weekly_data = pd.DataFrame()
-    # monthly_data = pd.DataFrame()
 
-    # 多线程获取数据
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        futures = []
-        for _, row in stock_df.iterrows():
-            code = row['code']
-            market_id = row['market_id']
-            name = row['name']
-            # for period in ["daily", "weekly", "monthly"]:
-            for period in ["daily"]:
-                futures.append(
-                    executor.submit(
-                        fetch_single_hist,
-                        code, market_id, period, name, "etf", beg, end
-                    )
-                )
+    # 单线程获取数据
+    for _, row in tqdm(stock_df.iterrows(), total=len(stock_df), desc="获取基金历史数据"):
+        code = row['code']
+        market_id = row['market_id']
+        name = row['name']
+        period = "daily"
 
-        # 合并数据
-        for future in tqdm(as_completed(futures), total=len(futures), desc="获取基金历史数据"):
-            data = future.result()
-            if data is None:
-                continue
-            df = data['df']
-            if data['period'] == 'daily':
-                daily_data = pd.concat([daily_data, df], ignore_index=True)
-            # elif data['period'] == 'weekly':
-            #     weekly_data = pd.concat([weekly_data, df], ignore_index=True)
-            # elif data['period'] == 'monthly':
-            #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
+        data = fetch_single_hist(code, market_id, period, name, "etf", beg, end)
+        if data is None:
+            continue
 
+        df = data['df']
+        if data['period'] == 'daily':
+            daily_data = pd.concat([daily_data, df], ignore_index=True)
+
+        # 添加延时
+        time.sleep(0.5)
 
     sync_and_write(CN_ETF_HIST_DAILY_DATA['name'], daily_data)
-    # sync_and_write(CN_ETF_HIST_WEEKLY_DATA['name'], weekly_data)
-    # sync_and_write(CN_ETF_HIST_MONTHLY_DATA['name'], monthly_data)
-    
-    # print(f"[Success] 基金历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
     print(f"[Success] 基金历史数据写入完成（日：{len(daily_data)}）")
 
 ########################################
@@ -312,44 +277,26 @@ def fetch_all_index_hist(beg: str = None, end: str = None):
 
     # 准备数据容器
     daily_data = pd.DataFrame()
-    # weekly_data = pd.DataFrame()
-    # monthly_data = pd.DataFrame()
 
-    # 多线程获取数据
-    with ThreadPoolExecutor(max_workers=1) as executor:
-        futures = []
-        for _, row in stock_df.iterrows():
-            code = row['code']
-            market_id = row['market_id']
-            name = row['name']
-            # for period in ["daily", "weekly", "monthly"]:
-            for period in ["daily"]:
-                futures.append(
-                    executor.submit(
-                        fetch_single_hist,
-                        code, market_id, period, name, "index", beg, end
-                    )
-                )
+    # 单线程获取数据
+    for _, row in tqdm(stock_df.iterrows(), total=len(stock_df), desc="获取指数历史数据"):
+        code = row['code']
+        market_id = row['market_id']
+        name = row['name']
+        period = "daily"
 
-        # 合并数据
-        for future in tqdm(as_completed(futures), total=len(futures), desc="获取指数历史数据"):
-            data = future.result()
-            if data is None:
-                continue
-            df = data['df']
-            if data['period'] == 'daily':
-                daily_data = pd.concat([daily_data, df], ignore_index=True)
-            # elif data['period'] == 'weekly':
-            #     weekly_data = pd.concat([weekly_data, df], ignore_index=True)
-            # elif data['period'] == 'monthly':
-            #     monthly_data = pd.concat([monthly_data, df], ignore_index=True)
+        data = fetch_single_hist(code, market_id, period, name, "index", beg, end)
+        if data is None:
+            continue
 
+        df = data['df']
+        if data['period'] == 'daily':
+            daily_data = pd.concat([daily_data, df], ignore_index=True)
+
+        # 添加延时
+        time.sleep(0.5)
 
     sync_and_write(CN_INDEX_HIST_DAILY_DATA['name'], daily_data)
-    # sync_and_write(CN_INDEX_HIST_WEEKLY_DATA['name'], weekly_data)
-    # sync_and_write(CN_INDEX_HIST_MONTHLY_DATA['name'], monthly_data)
-    
-    # print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}，周：{len(weekly_data)}，月：{len(monthly_data)}）")
     print(f"[Success] 指数历史数据写入完成（日：{len(daily_data)}）")
 
 
@@ -409,7 +356,7 @@ def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_ty
             for k in table_config['columns']
             if 'map' in table_config['columns'][k]
         }
-        
+
         # 格式转换与字段添加
         numeric_cols = [1,2,3,4,5,6,7,8,9,10]
         df[numeric_cols] = df[numeric_cols].apply(pd.to_numeric, errors='coerce')
@@ -420,7 +367,7 @@ def fetch_single_hist(code: str, market_id: str, period: str, name: str, data_ty
         df['code_int'] = code
         df['period'] = period
         df['name'] = name
-        
+
         return {'period': period, 'df': df, 'df_columns': df.columns}
     except Exception as e:
         print(f"获取{code} {period}数据失败: {str(e)}")
@@ -621,7 +568,7 @@ def 同步表结构(conn, table_name, data_columns):
     """动态添加缺失字段，附带调试日志和错误处理"""
     try:
         cursor = conn.cursor(buffered=True)
-        
+
         # 调试：打印基本信息
         # print(f"\n[DEBUG] 开始同步表结构：{table_name}")
         # print(f"[DEBUG] 数据列要求字段：{data_columns}")
@@ -640,17 +587,17 @@ def 同步表结构(conn, table_name, data_columns):
         for col in data_columns:
             try:
                 # print(f"\n[DEBUG] 正在检查字段：{col}")
-                
+
                 if col not in existing_columns:
                     if col in all_required_columns:
                         # 从配置获取字段类型
                         col_info = table_config['columns'][col]
                         sql_type = _get_sql_type(col_info['type'])
-                        
+
                         # 执行添加字段
                         alter_sql = f"ALTER TABLE `{table_name}` ADD COLUMN `{col}` {sql_type};"
                         print(f"[EXECUTE] 执行SQL：{alter_sql}")
-                        
+
                         cursor.execute(alter_sql)
                         # print(f"[SUCCESS] 字段 {col} 添加成功")
                     else:
@@ -677,11 +624,11 @@ def 同步表结构(conn, table_name, data_columns):
 def sql语句生成器(table_name, data, batch_size=5000):
     if 'code' in data.columns:
         data['code_int'] = data['code'].astype(int)
-    
+
     columns = ', '.join([f"`{col}`" for col in data.columns])
     unique_keys = ['date', 'code']
     update_clause = ', '.join([f"`{col}`=VALUES(`{col}`)" for col in data.columns if col not in unique_keys])
-    
+
     # 分批次处理数据
     sql_batches = []
     for i in range(0, len(data), batch_size):
@@ -700,7 +647,7 @@ def sql语句生成器(table_name, data, batch_size=5000):
                     cleaned = str(item).replace("'", "''")
                     values.append(f"'{cleaned}'")
             value_rows.append(f"({', '.join(values)})")
-        
+
         values_str = ',\n'.join(value_rows)
         sql = f"""
             INSERT INTO `{table_name}` ({columns})
@@ -708,7 +655,7 @@ def sql语句生成器(table_name, data, batch_size=5000):
             ON DUPLICATE KEY UPDATE {update_clause};
         """
         sql_batches.append(sql)
-    
+
     return '\n'.join(sql_batches)
 
 
@@ -721,11 +668,11 @@ def execute_raw_sql(sql, conn=None):
     if not conn:
         return False
     # ============== 修改结束 ==============
-    
+
     try:
         cursor = conn.cursor(buffered=True)
         statements = [s.strip() for s in sql.split(';') if s.strip()]
-        
+
         for statement in statements:
             try:
                 cursor.execute(statement)
@@ -755,7 +702,7 @@ def execute_raw_sql(sql, conn=None):
 #     try:
 #         cursor = connection.cursor(buffered=True)  # 使用缓冲游标
 #         statements = [s.strip() for s in sql.split(';') if s.strip()]
-        
+
 #         for i in range(0, len(statements), batch_size):
 #             batch = statements[i:i+batch_size]
 #             for statement in batch:
@@ -811,11 +758,11 @@ def is_within_trading_hours(now=None):
     """判断当前时间是否在交易时段内（收盘后视为有效）"""
     tz = pytz.timezone('Asia/Shanghai')
     now = now or datetime.datetime.now(tz)
-    
+
     # 判断是否为交易日
     if not is_trading_day(now):
         return False
-    
+
     # 判断是否在收盘时间后（15:00后视为收盘）
     market_close = now.replace(hour=15, minute=0, second=0, microsecond=0)
     return now >= market_close
@@ -829,7 +776,7 @@ def is_valid_trading_period(start_date: str, end_date: str) -> bool:
 # 修改后的main函数
 def main():
     sh_tz = pytz.timezone('Asia/Shanghai')
-    
+
     # 场景1: 无参数（自动判断当天）
     if len(sys.argv) == 1:
         now = datetime.datetime.now(sh_tz)
@@ -840,42 +787,42 @@ def main():
         fetch_all_stock_hist(today, today)
         fetch_all_etf_hist(today, today)
         fetch_all_index_hist(today, today)
-    
+
     # 场景2: 单日期模式
     elif len(sys.argv) == 2:
         date_str = sys.argv[1]
         try:
             clean_date = convert_date_format(date_str)
             dt = sh_tz.localize(datetime.datetime.strptime(clean_date, "%Y%m%d"))
-            
+
             if not is_trading_day(dt):
                 print(f"[{date_str}] 非交易日，终止执行")
                 return
-                
+
             fetch_all_stock_hist(clean_date, clean_date)
             fetch_all_etf_hist(clean_date, clean_date)
             fetch_all_index_hist(clean_date, clean_date)
-            
+
         except ValueError as e:
             print(f"日期格式错误：{e}")
-    
+
     # 场景3: 日期区间模式
     elif len(sys.argv) == 3:
         try:
             beg_str = convert_date_format(sys.argv[1])
             end_str = convert_date_format(sys.argv[2])
-            
+
             if not is_valid_trading_period(beg_str, end_str):
                 print(f"[{beg_str}-{end_str}] 区间无交易日，终止执行")
                 return
-                
+
             fetch_all_stock_hist(beg_str, end_str)
             fetch_all_etf_hist(beg_str, end_str)
             fetch_all_index_hist(beg_str, end_str)
-            
+
         except ValueError as e:
             print(f"日期格式错误：{e}")
-    
+
     else:
         print("参数错误！支持以下调用方式：")
         print("1. 无参数       -> 自动判断当天交易时段")
@@ -886,4 +833,3 @@ def main():
 # main函数入口
 if __name__ == '__main__':
     main()
-
