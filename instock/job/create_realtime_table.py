@@ -163,7 +163,7 @@ def create_tables():
         `归属净利润同比增长` FLOAT COMMENT '归属净利润同比增长',
         `报告期` DATE COMMENT '报告期',
         `总股本` FLOAT COMMENT '总股本',
-        `已流通股份` FLOAT COMMENT '已流通股份',
+        `已流通股份` BIGINT COMMENT '已流通股份',
         `总市值(亿元)` FLOAT COMMENT '总市值(亿元)',
         `流通市值(亿元)` FLOAT COMMENT '流通市值(亿元)',
         `所处行业` VARCHAR(100) COMMENT '所处行业',
@@ -332,6 +332,54 @@ def create_tables():
      """
 
 
+    # 东方财富行业实时数据表
+    realtime_industry_df_sql = """
+     CREATE TABLE IF NOT EXISTS `realtime_industry_df` (
+        `id` INT AUTO_INCREMENT PRIMARY KEY COMMENT '自增ID',
+        `date` DATE NOT NULL COMMENT '日期',
+        `date_int` INT NOT NULL COMMENT '日期整数格式',
+        `code` VARCHAR(6) NOT NULL COMMENT '股票代码',
+        `code_int` INT NOT NULL COMMENT '股票代码整数格式',
+        `symbol` VARCHAR(20) COMMENT '股票标识',
+        `name` VARCHAR(20) COMMENT '股票名称',
+        `市场标识` INT  COMMENT '市场标识',
+        `开盘价` FLOAT COMMENT '开盘价',
+        `最高价` FLOAT COMMENT '最高价',
+        `最低价` FLOAT COMMENT '最低价',
+        `收盘价` FLOAT COMMENT '收盘价',
+        `昨收价` FLOAT COMMENT '昨收价',
+        `成交量(手)` FLOAT COMMENT '成交量(手)',
+        `成交额(万元)` FLOAT COMMENT '成交额(万元)',
+        `振幅(%)` FLOAT COMMENT '振幅(%)',
+        `换手率(%)` FLOAT COMMENT '涨跌幅(%)',
+        `涨跌幅(%)` FLOAT COMMENT '涨跌幅(%)',
+        `涨跌额` FLOAT COMMENT '涨跌额',
+        `量比` FLOAT COMMENT '量比',
+        `涨速(%)` FLOAT COMMENT '涨速(%)',
+        `5分钟涨跌幅(%)` FLOAT COMMENT '5分钟涨跌幅(%)',
+        `60日涨跌幅(%)` FLOAT COMMENT '60日涨跌幅(%)',
+        `年初至今涨跌幅(%)` FLOAT COMMENT '年初至今涨跌幅(%)',
+        `已流通股份` BIGINT COMMENT '已流通股份',
+        `总市值(亿元)` FLOAT COMMENT '总市值(亿元)',
+        `流通市值(亿元)` FLOAT COMMENT '流通市值(亿元)',
+        `上市时间` DATE COMMENT '上市时间', 
+        `上涨家数` INT COMMENT '上涨家数',
+        `下跌家数` INT COMMENT '下跌家数',
+        `持平家数` INT COMMENT '持平家数',
+        `领涨股` VARCHAR(20) COMMENT '领涨股',
+        `领涨股代码` VARCHAR(6) COMMENT '领涨股代码',
+        `领涨股市场标识` INT  COMMENT '领涨股市场标识',
+        `领涨股涨跌幅(%)` FLOAT COMMENT '领涨股涨跌幅(%)',
+        `领跌股` VARCHAR(20) COMMENT '领跌股',
+        `领跌股代码` VARCHAR(6) COMMENT '领跌股代码',
+        `领跌股市场标识` INT  COMMENT '领跌股市场标识',
+        `领跌股涨跌幅(%)`  FLOAT COMMENT '领跌股涨跌幅(%)',
+        UNIQUE KEY `uniq_date_code` (`date_int`, `code_int`),
+        INDEX `idx_date` (`date`),
+        INDEX `idx_code` (`code_int`)
+     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='东方财富行业实时数据表';
+     """
+
 # 实时股票
     DBManager.execute_sql(realtime_stock_tx_sql)
     DBManager.execute_sql(realtime_stock_sina_sql)
@@ -347,6 +395,7 @@ def create_tables():
 
 # 实时行业
     DBManager.execute_sql(realtime_industry_tx_sql)
+    DBManager.execute_sql(realtime_industry_df_sql)
 
 
 if __name__ == "__main__":

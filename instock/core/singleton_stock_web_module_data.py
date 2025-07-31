@@ -28,50 +28,42 @@ class stock_web_module_data(metaclass=singleton_type):
             mode="query",
             type="基本数据",
             ico="fa fa-book",
-            name=tbs.TABLE_CN_STOCK_SPOT['cn'],
-            table_name=tbs.TABLE_CN_STOCK_SPOT['name'],
-            columns=tuple(tbs.TABLE_CN_STOCK_SPOT['columns']),
-            column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_SPOT['columns']),
+            name=tbs.kline_stock['cn'],
+            table_name=tbs.kline_stock['name'],
+            columns=tuple(tbs.kline_stock['columns']),
+            column_names=tbs.get_field_cns(tbs.kline_stock['columns']),
             primary_key=[],
-            is_realtime=True,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_STOCK_SPOT['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
+            is_realtime=True
         ), wmd.web_module_data(
             mode="query",
             type="基本数据",
             ico="fa fa-indent",
-            name=tbs.TABLE_CN_ETF_SPOT['cn'],
-            table_name=tbs.TABLE_CN_ETF_SPOT['name'],
-            columns=tuple(tbs.TABLE_CN_ETF_SPOT['columns']),
-            column_names=tbs.get_field_cns(tbs.TABLE_CN_ETF_SPOT['columns']),
+            name=tbs.kline_etf['cn'],
+            table_name=tbs.kline_etf['name'],
+            columns=tuple(tbs.kline_etf['columns']),
+            column_names=tbs.get_field_cns(tbs.kline_etf['columns']),
             primary_key=[],
             is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_ETF_SPOT['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
         ), wmd.web_module_data(
             mode="query",
             type="基本数据",
             ico="fa fa-indent",
-            name=tbs.TABLE_CN_INDEX_SPOT['cn'],
-            table_name=tbs.TABLE_CN_INDEX_SPOT['name'],
-            columns=tuple(tbs.TABLE_CN_INDEX_SPOT['columns']),
-            column_names=tbs.get_field_cns(tbs.TABLE_CN_INDEX_SPOT['columns']),
+            name=tbs.kline_index['cn'],
+            table_name=tbs.kline_index['name'],
+            columns=tuple(tbs.kline_index['columns']),
+            column_names=tbs.get_field_cns(tbs.kline_index['columns']),
             primary_key=[],
             is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_INDEX_SPOT['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
         ),wmd.web_module_data(
             mode="query",
             type="基本数据",
             ico="fa fa-book",
-            name=tbs.TABLE_CN_STOCK_FUND_FLOW['cn'],
-            table_name=tbs.TABLE_CN_STOCK_FUND_FLOW['name'],
-            columns=tuple(tbs.TABLE_CN_STOCK_FUND_FLOW['columns']),
-            column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_FUND_FLOW['columns']),
+            name=tbs.kline_industry['cn'],
+            table_name=tbs.kline_industry['name'],
+            columns=tuple(tbs.kline_industry['columns']),
+            column_names=tbs.get_field_cns(tbs.kline_industry['columns']),
             primary_key=[],
-            is_realtime=True,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_STOCK_FUND_FLOW['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
+            is_realtime=False,
         ), wmd.web_module_data(
             mode="query",
             type="基本数据",
@@ -81,7 +73,7 @@ class stock_web_module_data(metaclass=singleton_type):
             columns=tuple(tbs.TABLE_CN_STOCK_BONUS['columns']),
             column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_BONUS['columns']),
             primary_key=[],
-            is_realtime=True,
+            is_realtime=False,
             # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_STOCK_BONUS['name']}`.`code`) AS `cdatetime`",
             # order_by=" `cdatetime` DESC"
         ), wmd.web_module_data(
@@ -93,7 +85,7 @@ class stock_web_module_data(metaclass=singleton_type):
             columns=tuple(tbs.TABLE_CN_STOCK_TOP['columns']),
             column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_TOP['columns']),
             primary_key=[],
-            is_realtime=True,
+            is_realtime=False,
             # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_STOCK_TOP['name']}`.`code`) AS `cdatetime`",
             # order_by=" `cdatetime` DESC"
         ), wmd.web_module_data(
@@ -117,7 +109,7 @@ class stock_web_module_data(metaclass=singleton_type):
             columns=tuple(tbs.TABLE_CN_STOCK_FUND_FLOW_INDUSTRY['columns']),
             column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_FUND_FLOW_INDUSTRY['columns']),
             primary_key=[],
-            is_realtime=True,
+            is_realtime=False,
             order_by=" `fund_amount` DESC"
         ), wmd.web_module_data(
             mode="query",
@@ -128,7 +120,7 @@ class stock_web_module_data(metaclass=singleton_type):
             columns=tuple(tbs.TABLE_CN_STOCK_FUND_FLOW_CONCEPT['columns']),
             column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_FUND_FLOW_CONCEPT['columns']),
             primary_key=[],
-            is_realtime=True,
+            is_realtime=False,
             order_by=" `fund_amount` DESC"
         ),   wmd.web_module_data(
             mode="query",
@@ -146,30 +138,6 @@ class stock_web_module_data(metaclass=singleton_type):
             mode="query",
             type="历史行情数据",
             ico="fa fa-indent",
-            name=tbs.CN_STOCK_HIST_WEEKLY_DATA['cn'],
-            table_name=tbs.CN_STOCK_HIST_WEEKLY_DATA['name'],
-            columns=tuple(tbs.CN_STOCK_HIST_WEEKLY_DATA['columns']),
-            column_names=tbs.get_field_cns(tbs.CN_STOCK_HIST_WEEKLY_DATA['columns']),
-            primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.CN_STOCK_HIST_WEEKLY_DATA['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
-            mode="query",
-            type="历史行情数据",
-            ico="fa fa-indent",
-            name=tbs.CN_STOCK_HIST_MONTHLY_DATA['cn'],
-            table_name=tbs.CN_STOCK_HIST_MONTHLY_DATA['name'],
-            columns=tuple(tbs.CN_STOCK_HIST_MONTHLY_DATA['columns']),
-            column_names=tbs.get_field_cns(tbs.CN_STOCK_HIST_MONTHLY_DATA['columns']),
-            primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.CN_STOCK_HIST_MONTHLY_DATA['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
-            mode="query",
-            type="历史行情数据",
-            ico="fa fa-indent",
             name=tbs.CN_ETF_HIST_DAILY_DATA['cn'],
             table_name=tbs.CN_ETF_HIST_DAILY_DATA['name'],
             columns=tuple(tbs.CN_ETF_HIST_DAILY_DATA['columns']),
@@ -182,30 +150,6 @@ class stock_web_module_data(metaclass=singleton_type):
             mode="query",
             type="历史行情数据",
             ico="fa fa-indent",
-            name=tbs.CN_ETF_HIST_WEEKLY_DATA['cn'],
-            table_name=tbs.CN_ETF_HIST_WEEKLY_DATA['name'],
-            columns=tuple(tbs.CN_ETF_HIST_WEEKLY_DATA['columns']),
-            column_names=tbs.get_field_cns(tbs.CN_ETF_HIST_WEEKLY_DATA['columns']),
-            primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.CN_ETF_HIST_WEEKLY_DATA['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
-            mode="query",
-            type="历史行情数据",
-            ico="fa fa-indent",
-            name=tbs.CN_ETF_HIST_MONTHLY_DATA['cn'],
-            table_name=tbs.CN_ETF_HIST_MONTHLY_DATA['name'],
-            columns=tuple(tbs.CN_ETF_HIST_MONTHLY_DATA['columns']),
-            column_names=tbs.get_field_cns(tbs.CN_ETF_HIST_MONTHLY_DATA['columns']),
-            primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.CN_ETF_HIST_MONTHLY_DATA['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
-            mode="query",
-            type="历史行情数据",
-            ico="fa fa-indent",
             name=tbs.CN_INDEX_HIST_DAILY_DATA['cn'],
             table_name=tbs.CN_INDEX_HIST_DAILY_DATA['name'],
             columns=tuple(tbs.CN_INDEX_HIST_DAILY_DATA['columns']),
@@ -213,30 +157,6 @@ class stock_web_module_data(metaclass=singleton_type):
             primary_key=[],
             is_realtime=False,
             # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.CN_INDEX_HIST_DAILY_DATA['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
-            mode="query",
-            type="历史行情数据",
-            ico="fa fa-indent",
-            name=tbs.CN_INDEX_HIST_WEEKLY_DATA['cn'],
-            table_name=tbs.CN_INDEX_HIST_WEEKLY_DATA['name'],
-            columns=tuple(tbs.CN_INDEX_HIST_WEEKLY_DATA['columns']),
-            column_names=tbs.get_field_cns(tbs.CN_INDEX_HIST_WEEKLY_DATA['columns']),
-            primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.CN_INDEX_HIST_WEEKLY_DATA['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
-            mode="query",
-            type="历史行情数据",
-            ico="fa fa-indent",
-            name=tbs.CN_INDEX_HIST_MONTHLY_DATA['cn'],
-            table_name=tbs.CN_INDEX_HIST_MONTHLY_DATA['name'],
-            columns=tuple(tbs.CN_INDEX_HIST_MONTHLY_DATA['columns']),
-            column_names=tbs.get_field_cns(tbs.CN_INDEX_HIST_MONTHLY_DATA['columns']),
-            primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.CN_INDEX_HIST_MONTHLY_DATA['name']}`.`code`) AS `cdatetime`",
             # order_by=" `cdatetime` DESC"
         ), wmd.web_module_data(
             mode="query",
@@ -360,19 +280,8 @@ class stock_web_module_data(metaclass=singleton_type):
             is_realtime=False,
             # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_INDEX_INDICATORS_SELL['name']}`.`code`) AS `cdatetime`",
             # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
-            mode="query",
-            type="股票K线形态",
-            ico="fa fa-tag",
-            name=tbs.TABLE_CN_STOCK_KLINE_PATTERN['cn'],
-            table_name=tbs.TABLE_CN_STOCK_KLINE_PATTERN['name'],
-            columns=tuple(tbs.TABLE_CN_STOCK_KLINE_PATTERN['columns']),
-            column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_KLINE_PATTERN['columns']),
-            primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_STOCK_KLINE_PATTERN['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
-        ), wmd.web_module_data(
+        ),
+            wmd.web_module_data(
             mode="query",
             type="股票策略数据",
             ico="fa fa-check-square-o",
@@ -381,9 +290,8 @@ class stock_web_module_data(metaclass=singleton_type):
             columns=tuple(tbs.TABLE_CN_STOCK_SPOT_BUY['columns']),
             column_names=tbs.get_field_cns(tbs.TABLE_CN_STOCK_SPOT_BUY['columns']),
             primary_key=[],
-            is_realtime=False,
-            # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{tbs.TABLE_CN_STOCK_SPOT_BUY['name']}`.`code`) AS `cdatetime`",
-            # order_by=" `cdatetime` DESC"
+            is_realtime=False
+
         )]
 
         for table in tbs.TABLE_CN_STOCK_STRATEGIES:
@@ -397,9 +305,7 @@ class stock_web_module_data(metaclass=singleton_type):
                     columns=tuple(table['columns']),
                     column_names=tbs.get_field_cns(table['columns']),
                     primary_key=[],
-                    is_realtime=False,
-                    # order_columns=f"(SELECT `datetime` FROM `{tbs.TABLE_CN_STOCK_ATTENTION['name']}` WHERE `code`=`{table['name']}`.`code`) AS `cdatetime`",
-                    # order_by=" `cdatetime` DESC"
+                    is_realtime=False
                 )
             )
         for tmp in self.data_list:

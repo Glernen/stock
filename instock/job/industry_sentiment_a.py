@@ -132,99 +132,108 @@ def get_market_sentiment_data():
 
         sql = f"""
         WITH 行业基础数据 AS (
-            SELECT 
-                name AS 行业名称,
-                date_int AS date_int,
-                -- 原始指标
-                kdjK, kdjD, kdjk_day1, kdjd_day1, kdjk_day2, kdjd_day2,
-                wr_6, wr_6_day1, wr_6_day2,
-                cci, cci_day1, cci_day2
-            FROM industry_3day_indicators
-          WHERE
-            (
-              str_to_date(`industry_3day_indicators`.`date_int`, '%Y%m%d') >= ((SELECT max(str_to_date(`industry_3day_indicators`.`date_int`, '%Y%m%d')) FROM `industry_3day_indicators`) - INTERVAL 1 MONTH)
-            )
-        ),
-        趋势判断 AS (
-            SELECT 
-                行业名称,
-                date_int,
-                -- KDJ趋势判断
-                CASE 
-                    WHEN kdjK > kdjk_day1 AND kdjD > kdjd_day1 
---                         AND kdjk_day1 <= kdjk_day2 AND kdjd_day1 <= kdjd_day2 
-                    THEN '上涨趋势'
-                    WHEN kdjK < kdjk_day1 AND kdjD < kdjd_day1 
---                         AND kdjk_day1 >= kdjk_day2 AND kdjd_day1 >= kdjd_day2 
-                    THEN '下降趋势'
-                    ELSE '趋势中性'
-                END AS KDJ趋势,
-                
-                -- 威廉指标趋势
-                CASE 
-                    WHEN wr_6 > wr_6_day1 AND wr_6_day1 > wr_6_day2 
-                    THEN '持续超卖'
-                    WHEN wr_6 < wr_6_day1 AND wr_6_day1 < wr_6_day2 
-                    THEN '持续超买'
-                    ELSE '震荡状态'
-                END AS WR趋势,
-                
-                -- CCI趋势
-                CASE 
-                    WHEN cci > cci_day1 AND cci_day1 > cci_day2 
-                    THEN '多头强化'
-                    WHEN cci < cci_day1 AND cci_day1 < cci_day2 
-                    THEN '空头强化'
-                    ELSE '方向不明'
-                END AS CCI趋势
-            FROM 行业基础数据
-        ),
-        买卖信号 AS (
-            SELECT 
-                趋势判断.行业名称,
-                趋势判断.date_int,
-                趋势判断.KDJ趋势,
-                趋势判断.WR趋势,
-                趋势判断.CCI趋势,
-                -- 强烈买入信号（行业级复合条件）
-                CASE 
-                    WHEN 趋势判断.KDJ趋势 = '上涨趋势' 
---                 AND 趋势判断.WR趋势 = '持续超卖' 
-                        AND 趋势判断.CCI趋势 = '多头强化' 
-                        AND 行业基础数据.cci > -150  -- 当前值突破阈值
-                    THEN 1 
-                    ELSE 0 
-                END AS 强烈买入信号,
-                
-                -- 强烈卖出信号（行业级复合条件）
-                CASE 
-                    WHEN 趋势判断.KDJ趋势 = '下降趋势' 
---                 AND 趋势判断.WR趋势 = '持续超买' 
-                        AND 趋势判断.CCI趋势 = '空头强化' 
-                        AND 行业基础数据.cci < 150  -- 当前值跌破阈值
-                    THEN 1 
-                    ELSE 0 
-                END AS 强烈卖出信号
-            FROM 趋势判断
-            JOIN 行业基础数据 USING (行业名称, date_int)
-        )
-        SELECT 
-            date_int,
-            行业名称,
-            KDJ趋势,
-            WR趋势,
-            CCI趋势,
-            强烈买入信号,
-            强烈卖出信号,
-            -- 综合情绪判断
-            CASE 
-                WHEN 强烈买入信号 = 1 AND 强烈卖出信号 = 0 THEN '行业强势看涨'
-                WHEN 强烈卖出信号 = 1 AND 强烈买入信号 = 0 THEN '行业弱势看跌'
-                WHEN 强烈买入信号 + 强烈卖出信号 = 0 THEN '行业震荡中性'
-                ELSE '多空博弈激烈' 
-            END AS 行业情绪
-        FROM 买卖信号
---         WHERE KDJ趋势 = '上涨趋势'
+                    SELECT 
+                        code,
+                        code_int,
+                        name AS 行业名称,
+                        date AS date,
+                        date_int AS date_int,
+                        -- 原始指标
+                        kdjK, kdjD, kdjk_day1, kdjd_day1, kdjk_day2, kdjd_day2,
+                        wr_6, wr_6_day1, wr_6_day2,
+                        cci, cci_day1, cci_day2
+                    FROM industry_3day_indicators
+                  WHERE
+                    (
+                      str_to_date(`industry_3day_indicators`.`date_int`, '%Y%m%d') >= ((SELECT max(str_to_date(`industry_3day_indicators`.`date_int`, '%Y%m%d')) FROM `industry_3day_indicators`) - INTERVAL 1 MONTH)
+                    )
+                ),
+                趋势判断 AS (
+                    SELECT 
+                        code_int,  -- 新增code_int用于关联
+                        行业名称,
+                        date,
+                        date_int,
+                        -- KDJ趋势判断
+                        CASE 
+                            WHEN kdjK > kdjk_day1 AND kdjD > kdjd_day1 
+                            THEN '上涨趋势'
+                            WHEN kdjK < kdjk_day1 AND kdjD < kdjd_day1 
+                            THEN '下降趋势'
+                            ELSE '趋势中性'
+                        END AS KDJ趋势,
+                        
+                        -- 威廉指标趋势
+                        CASE 
+                            WHEN wr_6 > wr_6_day1 AND wr_6_day1 > wr_6_day2 
+                            THEN '持续超卖'
+                            WHEN wr_6 < wr_6_day1 AND wr_6_day1 < wr_6_day2 
+                            THEN '持续超买'
+                            ELSE '震荡状态'
+                        END AS WR趋势,
+                        
+                        -- CCI趋势
+                        CASE 
+                            WHEN cci > cci_day1 AND cci_day1 > cci_day2 
+                            THEN '多头强化'
+                            WHEN cci < cci_day1 AND cci_day1 < cci_day2 
+                            THEN '空头强化'
+                            ELSE '方向不明'
+                        END AS CCI趋势
+                    FROM 行业基础数据
+                ),
+                买卖信号 AS (
+                    SELECT 
+                        趋势判断.行业名称,
+                        趋势判断.date,
+                        趋势判断.date_int,
+                        行业基础数据.code,
+                        行业基础数据.code_int,  -- 保留code_int字段
+                        趋势判断.KDJ趋势,
+                        趋势判断.WR趋势,
+                        趋势判断.CCI趋势,
+                        -- 强烈买入信号
+                        CASE 
+                            WHEN 趋势判断.KDJ趋势 = '上涨趋势' 
+                                AND 趋势判断.CCI趋势 = '多头强化' 
+                                AND 行业基础数据.cci > -150  
+                            THEN 1 
+                            ELSE 0 
+                        END AS 强烈买入信号,
+                        
+                        -- 强烈卖出信号
+                        CASE 
+                            WHEN 趋势判断.KDJ趋势 = '下降趋势' 
+                                AND 趋势判断.CCI趋势 = '空头强化' 
+                                AND 行业基础数据.cci < 150  
+                            THEN 1 
+                            ELSE 0 
+                        END AS 强烈卖出信号
+                    FROM 趋势判断
+                    -- 改用code_int和date_int双字段关联，替代原行业名称关联
+                    JOIN 行业基础数据 
+                        ON 趋势判断.code_int = 行业基础数据.code_int 
+                        AND 趋势判断.date_int = 行业基础数据.date_int
+                )
+                SELECT 
+                    date,
+                    date_int,
+                    code,
+                    code_int,
+                    行业名称,
+                    KDJ趋势,
+                    WR趋势,
+                    CCI趋势,
+                    强烈买入信号,
+                    强烈卖出信号,
+                    -- 综合情绪判断
+                    CASE 
+                        WHEN 强烈买入信号 = 1 AND 强烈卖出信号 = 0 THEN '行业强势看涨'
+                        WHEN 强烈卖出信号 = 1 AND 强烈买入信号 = 0 THEN '行业弱势看跌'
+                        WHEN 强烈买入信号 + 强烈卖出信号 = 0 THEN '行业震荡中性'
+                        ELSE '多空博弈激烈' 
+                    END AS 行业情绪
+                FROM 买卖信号;
         """
         
         with mdb.engine().connect() as conn:
@@ -254,6 +263,8 @@ def create_optimized_table():
     CREATE TABLE IF NOT EXISTS `{table_name}` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
         `date_int` INT NOT NULL COMMENT '日期YYYYMMDD格式',
+        `code` VARCHAR(6),
+        `code_int` INT,
         `行业名称` VARCHAR(50),
         `KDJ趋势` VARCHAR(50),
         `WR趋势` VARCHAR(50),
@@ -261,7 +272,7 @@ def create_optimized_table():
         `强烈买入信号` INT,
         `强烈卖出信号` INT,
         `行业情绪` VARCHAR(50),
-        UNIQUE KEY `idx_date_名称` (`date_int`,`行业名称`)
+        UNIQUE KEY `idx_date_名称` (`date_int`,`code_int`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci COMMENT='行业情绪分析表';
     """
     
@@ -340,34 +351,6 @@ def optimized_data_insert(data):
     except Exception as e:
         logging.error(f"操作失败，详细错误：{str(e)}", exc_info=True)
         raise
-
-
-# 优化后的数据插入函数
-# def optimized_data_insert(data):
-#     table_name = "industry_sentiment_a"
-#     try:
-#         # 自定义插入方法，使用INSERT IGNORE避免重复
-#         def insert_ignore(table, conn, keys, data_iter):
-#             from sqlalchemy.dialects.mysql import insert
-#             data_rows = [dict(zip(keys, row)) for row in data_iter]
-#             if not data_rows:
-#                 return
-#             stmt = insert(table.table).values(data_rows).prefix_with('IGNORE')
-#             conn.execute(stmt)
-        
-#         # 使用自定义方法插入数据
-#         data.to_sql(
-#             name=table_name,
-#             con=mdb.engine(),
-#             if_exists='append',
-#             index=False,
-#             chunksize=500,
-#             method=insert_ignore
-#         )
-#         logging.info("数据插入完成，重复记录已自动忽略")
-#     except Exception as e:
-#         logging.error(f"数据插入失败: {e}")
-#         raise
 
 
 

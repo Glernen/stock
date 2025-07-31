@@ -32,6 +32,85 @@ _COLLATE = "utf8mb4_general_ci"
 
 
 
+###########################################
+# 基础字段结构（新增'en'字段）
+kline_stock = {
+    'name': 'kline_stock',
+    'cn': '股票K线',
+    'columns': {
+                'date_int':    {'type': INT,  'cn': '日期_int', 'en': 'date_int', 'map': None, 'size': 90},
+                'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
+                'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
+                'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  # 对应 open_price 的 map: f17
+                'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},   # 对应 new_price 的 map: f2
+                'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70},  # 对应 high_price 的 map: f15
+                'low':     {'type': FLOAT, 'cn': '最低价', 'en': 'low', 'map': 4, 'size': 70},    # 对应 low_price 的 map: f16
+                'volume':  {'type': FLOAT, 'cn': '成交量（手）', 'en': 'volume', 'map': 5, 'size': 120},  # 对应 volume 的 map: f5
+                'turnoverrate': {'type': FLOAT, 'cn': '换手率', 'en': 'turnover', 'map': 10, 'size': 120} ,
+    }}
+
+
+kline_index = {
+    'name': 'kline_index',
+    'cn': '指数K线',
+    'columns': {
+                'date_int':    {'type': INT,  'cn': '日期_int', 'en': 'date_int', 'map': None, 'size': 90},
+                'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
+                'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
+                'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  # 对应 open_price 的 map: f17
+                'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},   # 对应 new_price 的 map: f2
+                'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70},  # 对应 high_price 的 map: f15
+                'low':     {'type': FLOAT, 'cn': '最低价', 'en': 'low', 'map': 4, 'size': 70},    # 对应 low_price 的 map: f16
+                'volume':  {'type': FLOAT, 'cn': '成交量（手）', 'en': 'volume', 'map': 5, 'size': 120},  # 对应 volume 的 map: f5
+                'turnoverrate': {'type': FLOAT, 'cn': '换手率', 'en': 'turnover', 'map': 10, 'size': 120} ,
+    }}
+
+kline_etf = {
+    'name': 'kline_etf',
+    'cn': '基金K线',
+    'columns': {
+                'date_int':    {'type': INT,  'cn': '日期_int', 'en': 'date_int', 'map': None, 'size': 90},
+                'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
+                'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
+                'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  # 对应 open_price 的 map: f17
+                'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},   # 对应 new_price 的 map: f2
+                'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70},  # 对应 high_price 的 map: f15
+                'low':     {'type': FLOAT, 'cn': '最低价', 'en': 'low', 'map': 4, 'size': 70},    # 对应 low_price 的 map: f16
+                'volume':  {'type': FLOAT, 'cn': '成交量（手）', 'en': 'volume', 'map': 5, 'size': 120},  # 对应 volume 的 map: f5
+                'turnoverrate': {'type': FLOAT, 'cn': '换手率', 'en': 'turnover', 'map': 10, 'size': 120} ,
+    }}
+
+kline_industry = {
+    'name': 'kline_industry',
+    'cn': '东方财富行业K线',
+    'columns': {
+                'date_int':    {'type': INT,  'cn': '日期_int', 'en': 'date_int', 'map': None, 'size': 90},
+                'name': {'type': VARCHAR(20, collation=_COLLATE), 'cn': '名称', 'size': 120, 'en': 'name'},
+                'code': {'type': VARCHAR(6, _COLLATE), 'cn': '代码', 'size': 70, 'en': 'code'},
+                'open':    {'type': FLOAT, 'cn': '开盘价', 'en': 'open', 'map': 1, 'size': 70},  # 对应 open_price 的 map: f17
+                'close':   {'type': FLOAT, 'cn': '收盘价', 'en': 'close', 'map': 2, 'size': 70},   # 对应 new_price 的 map: f2
+                'high':    {'type': FLOAT, 'cn': '最高价', 'en': 'high', 'map': 3, 'size': 70},  # 对应 high_price 的 map: f15
+                'low':     {'type': FLOAT, 'cn': '最低价', 'en': 'low', 'map': 4, 'size': 70},    # 对应 low_price 的 map: f16
+                'volume':  {'type': FLOAT, 'cn': '成交量（手）', 'en': 'volume', 'map': 5, 'size': 120},  # 对应 volume 的 map: f5
+                'turnoverrate': {'type': FLOAT, 'cn': '换手率', 'en': 'turnover', 'map': 10, 'size': 120} ,
+    }}
+
+
+
+
+
+
+
+
+
+
+################################################
+
+
+
+
+
+
 
 TABLE_STOCK_INIT = {
     'name': 'cn_stock_info',

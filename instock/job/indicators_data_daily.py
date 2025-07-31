@@ -151,11 +151,6 @@ def calculate_indicators(data):
     daily_data_indicators['emv'] = ((hl_avg - prev_hl_avg) * (data['high'] - data['low']) / volume).rolling(14).sum()
     daily_data_indicators['emva'] = daily_data_indicators['emv'].rolling(9).mean()
 
-    # # 计算BIAS
-    # daily_data_indicators['bias'] = (data['close'] - tl.SMA(data['close'], timeperiod=6)) / tl.SMA(data['close'], timeperiod=6) * 100
-    # daily_data_indicators['bias_12'] = (data['close'] - tl.SMA(data['close'], timeperiod=12)) / tl.SMA(data['close'], timeperiod=12) * 100
-    # daily_data_indicators['bias_24'] = (data['close'] - tl.SMA(data['close'], timeperiod=24)) / tl.SMA(data['close'], timeperiod=24) * 100
-
     # 计算MFI
     daily_data_indicators['mfi'] = tl.MFI(data['high'], data['low'], data['close'], data['volume'])
     daily_data_indicators['mfisma'] = tl.SMA(daily_data_indicators['mfi'])
@@ -176,14 +171,6 @@ def calculate_indicators(data):
     daily_data_indicators['wt1'] = (data['close'] - tl.SMA(data['close'], timeperiod=10)) / tl.STDDEV(data['close'], timeperiod=10)
     daily_data_indicators['wt2'] = (data['close'] - tl.SMA(data['close'], timeperiod=20)) / tl.STDDEV(data['close'], timeperiod=20)
 
-    # 计算Supertrend（简单示例，实际可能需要更复杂的实现）
-    # atr_multiplier = 3
-    # daily_data_indicators['atr'] = tl.ATR(data['high'], data['low'], data['close'])
-    # daily_data_indicators['upper_band'] = data['close'] + (atr_multiplier * daily_data_indicators['atr'])
-    # daily_data_indicators['lower_band'] = data['close'] - (atr_multiplier * daily_data_indicators['atr'])
-    # daily_data_indicators['supertrend'] = daily_data_indicators['upper_band']
-    # daily_data_indicators['supertrend_ub'] = daily_data_indicators['upper_band']
-    # daily_data_indicators['supertrend_lb'] = daily_data_indicators['lower_band']
 
     # 计算DPO
     daily_data_indicators['dpo'] = data['close'] - tl.SMA(data['close'], timeperiod=20)
@@ -256,6 +243,10 @@ TABLE_MAP = {
     'index': {
         'hist_table': 'kline_index',  # 改为新的指数K线数据表
         'info_table': 'basic_info_index'  # 改为新的指数基本信息表
+    },
+    'industry': {
+        'hist_table': 'kline_industry',  # 改为新的行业K线数据表
+        'info_table': 'basic_info_industry'  # 改为新的行业基本信息表
     }
 }
 
@@ -263,7 +254,8 @@ TABLE_MAP = {
 INDICATOR_TABLES = {
     'stock': 'cn_stock_indicators',
     'etf': 'cn_etf_indicators',
-    'index': 'cn_index_indicators'
+    'index': 'cn_index_indicators',
+    'industry': 'cn_industry_indicators'
 }
 
 # 数据库连接配置
@@ -653,7 +645,7 @@ def batch(iterable, batch_size=100):
 
 def check_if_first_run() -> bool:
     """检查是否为首次运行（所有指标表无数据或表不存在）"""
-    for data_type in ['stock', 'etf', 'index']:
+    for data_type in ['stock', 'etf', 'index', 'industry']:
         table_name = INDICATOR_TABLES[data_type]
         try:
             with DBManager.get_new_connection() as conn:
@@ -786,7 +778,7 @@ def main():
 
     try:
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            for data_type in ['stock', 'index']:
+            for data_type in ['stock', 'etf', 'index', 'industry']:
                 codes = get_latest_codes(data_type)
                 if not codes:
                     print(f"⚠️ 未找到{data_type}代码，跳过")

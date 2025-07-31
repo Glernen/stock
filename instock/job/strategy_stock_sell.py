@@ -107,7 +107,7 @@ def guess_buy(strategy_name, start_date_int, end_date_int=None):
             三日指标.date ,
             三日指标.date_int ,
             三日指标.kdjj,
-            资金.jingliuru_cn ,
+            资金.`主力净流入(万元)` as jingliuru_cn ,
             三日指标.close ,
             三日指标.turnover ,
             三日指标.industry ,
@@ -123,7 +123,7 @@ def guess_buy(strategy_name, start_date_int, end_date_int=None):
         FROM
             stock_3day_indicators 三日指标
             LEFT JOIN cn_stock_info 基础信息 ON 基础信息.code_int = 三日指标.code_int
-            LEFT JOIN stock_zijin 资金 ON 资金.code_int = 三日指标.code_int AND 资金.date_int = 三日指标.date_int
+            LEFT JOIN realtime_stock_tx 资金 ON 资金.code_int = 三日指标.code_int AND 资金.date_int = 三日指标.date_int
             LEFT JOIN market_sentiment_a 大盘情绪 ON 大盘情绪.date_int = 三日指标.date_int
             LEFT JOIN industry_3day_indicators 行业指标 ON 行业指标.name = 三日指标.industry AND 行业指标.date_int = 三日指标.date_int
             LEFT JOIN industry_sentiment_a 行业数据 ON 行业数据.行业名称 = 三日指标.industry AND 行业数据.date_int = 三日指标.date_int

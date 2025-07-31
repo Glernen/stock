@@ -19,7 +19,7 @@ import datetime
 import mysql.connector
 from sqlalchemy import create_engine, DATE, FLOAT, VARCHAR, INT
 from mysql.connector import Error
-from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
+from instock.lib.database import db_host, db_user, db_password, db_database, db_charset
 
 # 数据库配置
 db_config = {
@@ -114,10 +114,10 @@ TABLE_CN_STOCK_INDICATORS_SELL = {
 
 # 回测字段配置
 backtest_columns = [
-    'date_int', 'code_int' , 'code', 'date', 'name', 
-    'strategy', 'close', 'kdjj', 'turnover', 'jingliuru_cn', 
-    'industry ', 'up_sentiment', 'down_sentiment', 
-    'industry_kdjj', 'industry_kdjj_day1', 'industry_kdj', 
+    'date_int', 'code_int' , 'code', 'date', 'name',
+    'strategy', 'close', 'kdjj', 'turnover', 'jingliuru_cn',
+    'industry', 'up_sentiment', 'down_sentiment',
+    'industry_kdjj', 'industry_kdjj_day1', 'industry_kdj',
     'industry_wr', 'industry_cci', 'industry_sentiment'
 
 ] + [f'rate_{i}' for i in range(1, 101)]
@@ -128,16 +128,19 @@ class StockHistData:
             f"mysql+mysqlconnector://{db_config['user']}:{db_config['password']}@{db_config['host']}/{db_config['database']}"
         )
 
-    def get_recent_data(self, days=60):
+    def get_recent_data(self, days=100):
         """获取最近N天的股票历史数据"""
         end_date = datetime.datetime.now().strftime("%Y%m%d")
         start_date = (datetime.datetime.now() - datetime.timedelta(days=days)).strftime("%Y%m%d")
-        
         query = f"""
-            SELECT * FROM cn_stock_hist_daily 
-            WHERE date_int BETWEEN {start_date} AND {end_date} 
-            ORDER BY date_int ASC  
+            SELECT * FROM kline_stock
+            ORDER BY date_int ASC
         """
+        # query = f"""
+        #     SELECT * FROM kline_stock
+        #     WHERE date_int BETWEEN {start_date} AND {end_date}
+        #     ORDER BY date_int ASC
+        # """
         try:
             df = pd.read_sql_query(query, self.engine)
             # df['date'] = pd.to_datetime(df['date'], format='%Y%m%d')
@@ -148,8 +151,8 @@ class StockHistData:
 
 def prepare():
     # tables = [TABLE_CN_STOCK_INDICATORS_BUY, TABLE_CN_STOCK_INDICATORS_SELL]
-    tables = [TABLE_CN_STOCK_INDICATORS_BUY,TABLE_STRATEGY_STOCK_BUY_OPTIMIZATION]
-    
+    tables = [TABLE_CN_STOCK_INDICATORS_BUY,TABLE_CN_STOCK_INDICATORS_SELL,TABLE_STRATEGY_STOCK_BUY_OPTIMIZATION]
+
     # 获取历史数据
     hist_data = StockHistData().get_recent_data()
     if hist_data is None:
@@ -162,13 +165,38 @@ def prepare():
             executor.submit(process_table, table, hist_data)
 
 def process_table(table, hist_data):
+    # 添加在 process_table 函数内
+    def safe_float(value):
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return None
+        try:
+            return float(value)
+        except:
+            return None
+
+    def safe_str(value):
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return None
+        try:
+            return str(value)
+        except:
+            return None
+
+    def safe_int(value):
+        if value is None or (isinstance(value, float) and np.isnan(value)):
+            return None
+        try:
+            return int(value)
+        except:
+            return None
+
     table_name = table['name']
-    
+
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
         cursor.execute(f"""
-            SELECT date, date_int, code , code_int, name, strategy, close, kdjj, turnover, jingliuru_cn, industry , up_sentiment, down_sentiment, industry_kdjj, industry_kdjj_day1, industry_kdj, industry_wr, industry_cci, industry_sentiment
+            SELECT date, date_int, code , code_int, name, strategy, close, kdjj, turnover, jingliuru_cn, industry, up_sentiment, down_sentiment, industry_kdjj, industry_kdjj_day1, industry_kdj, industry_wr, industry_cci, industry_sentiment
             FROM {table_name}
             WHERE rate_60 IS NULL
         """)
@@ -182,19 +210,19 @@ def process_table(table, hist_data):
                 date_int = stock[1]
                 code_int = stock[3]
                 key = (date_int, code_int)
-                
+
                 # 从预加载数据中筛选当前股票的数据
                 stock_data = hist_data.xs(code_int, level='code_int', drop_level=False)
                 # print(f"\n股票{code_int}总数据量：{len(stock_data)}条")
-                
+
                 # 找到当前日期在时间序列中的位置
                 date_index = stock_data.index.get_loc(key)
                 # print(f"当前记录在时间序列中的位置：{date_index}")
-                
+
                 # 获取从当前日期开始往后100天的数据
-                needed_data = stock_data.iloc[date_index:date_index+100]
+                needed_data = stock_data.iloc[date_index:date_index+90]
                 # print(f"可用于计算的数据量：{len(needed_data)}")
-                
+
                 rates = calculate_rates(stock, needed_data)
                 results[key] = rates
 
@@ -212,7 +240,7 @@ def process_table(table, hist_data):
                 if not current_stock:
                     print(f"未找到匹配的股票数据 date_int={date_int} code_int={code_int}")
                     continue
-                
+
                 # 添加详细日志输出
                 # print(f"\n正在构建更新数据：")
                 # print(f"日期: {date_int} 代码: {code_int}")
@@ -224,31 +252,31 @@ def process_table(table, hist_data):
                 formatted_rates = [float(rate) if rate is not None else None for rate in rates]  # 转换numpy类型
 
                 update_row = [
-                    current_stock[2],  # code
-                    formatted_date,  #date
-                    current_stock[4],  # name  
-                    current_stock[5] if len(current_stock) > 5 else '',  # strategy
-                    float(current_stock[6]) if len(current_stock) > 6 and current_stock[6] is not None else 0.0,  # close
-                    float(current_stock[7]) if len(current_stock) > 7 and current_stock[7] is not None else 0.0,  # kdjj
-                    float(current_stock[8]) if len(current_stock) > 8 and current_stock[8] is not None else 0.0,  # turnover
-                    str(current_stock[9]) if len(current_stock) > 9 and current_stock[9] is not None else '',  # jingliuru_cn
-                    current_stock[10] if len(current_stock) > 10 and current_stock[10] is not None else '',   # industry
-                    int(current_stock[11]) if len(current_stock) > 11 and current_stock[11] is not None else 404, # up_sentiment
-                    int(current_stock[12]) if len(current_stock) > 12 and current_stock[12] is not None else 404,  # down_sentiment
-                    float(current_stock[13]) if len(current_stock) > 13 and current_stock[13] is not None else 0.0,  # industry_kdjj
-                    float(current_stock[14]) if len(current_stock) > 14 and current_stock[14] is not None else 0.0,  # industry_kdjj_day1
-                    current_stock[15] if len(current_stock) > 15 and current_stock[15] is not None else '',  # industry_kdj
-                    current_stock[16] if len(current_stock) > 16 and current_stock[16] is not None else '',  # industry_wr
-                    current_stock[17] if len(current_stock) > 17 and current_stock[17] is not None else '',  # industry_cci
-                    current_stock[18] if len(current_stock) > 18 and current_stock[18] is not None else '',  # industry_sentiment
+                     current_stock[2],  # code
+                     formatted_date,  # date
+                     safe_str(current_stock[4]),  # name
+                     safe_str(current_stock[5]) if len(current_stock) > 5 else None,  # strategy
+                     safe_float(current_stock[6]) if len(current_stock) > 6 else None,  # close
+                     safe_float(current_stock[7]) if len(current_stock) > 7 else None,  # kdjj
+                     safe_float(current_stock[8]) if len(current_stock) > 8 else None,  # turnover
+                     safe_str(current_stock[9]) if len(current_stock) > 9 else None,  # jingliuru_cn
+                     safe_str(current_stock[10]) if len(current_stock) > 10 else None,  # industry
+                     safe_int(current_stock[11]) if len(current_stock) > 11 else None,  # up_sentiment
+                     safe_int(current_stock[12]) if len(current_stock) > 12 else None,  # down_sentiment
+                     safe_float(current_stock[13]) if len(current_stock) > 13 else None,  # industry_kdjj
+                     safe_float(current_stock[14]) if len(current_stock) > 14 else None,  # industry_kdjj_day1
+                     safe_str(current_stock[15]) if len(current_stock) > 15 else None,  # industry_kdj
+                     safe_str(current_stock[16]) if len(current_stock) > 16 else None,  # industry_wr
+                     safe_str(current_stock[17]) if len(current_stock) > 17 else None,  # industry_cci
+                     safe_str(current_stock[18]) if len(current_stock) > 18 else None,  # industry_sentiment
                     *formatted_rates,   # rate_1~rate_100
                 ] + [
                     date_int,  # WHERE条件
                     code_int
                 ]
 
-                print(f"参数数量验证: {len(update_row)} 应等于: {len(backtest_columns[2:])+2}")
-                print(f"示例数据：{update_row[:8]}...{update_row[-3:]}")
+                # print(f"参数数量验证: {len(update_row)} 应等于: {len(backtest_columns[2:])+2}")
+                # print(f"示例数据：{update_row[:8]}...{update_row[-3:]}")
                 update_data.append(tuple(update_row))
 
             # 添加SQL调试信息
@@ -258,7 +286,7 @@ def process_table(table, hist_data):
             print(f"SET子句字段数：{len(backtest_columns[2:])} 实际：{set_clause.count('%s')}")
             print(f"WHERE条件参数数：2")
             print(f"总占位符数：{set_clause.count('%s') + 2}")
-            
+
             update_query = f"""
                 UPDATE {table_name}
                 SET {set_clause}
@@ -287,37 +315,49 @@ def process_table(table, hist_data):
             cursor.close()
             conn.close()
 
+
 def calculate_rates(stock, stock_data):
     """计算收益率（处理单行数据）"""
     try:
-        # 添加空数据检查
         if len(stock_data) == 0:
             print("空数据输入")
-            return [None]*100
-            
-        # 修正索引访问方式
-        # print(f"\n当前基准数据：")
-        # print(f"日期：{stock_data.index[0][0]} 收盘价：{stock_data.iloc[0]['close']}")
-        
+            return [None] * 100
+
+        # 获取基准收盘价
         base_close = stock_data.iloc[0]['close']
+
+        # 检查基准收盘价是否有效
+        if pd.isna(base_close) or base_close == 0:
+            print(f"无效基准价: {base_close}，股票: {stock_data.iloc[0]['code']} 日期: {stock_data.iloc[0]['date']}")
+            return [None] * 100
+
         rates = []
-        
-        # 添加边界检查
-        max_days = min(len(stock_data)-1, 100)  # 确保最多取100天
-        
-        for i in range(1, max_days+1):
+        max_days = min(len(stock_data) - 1, 100)
+
+        for i in range(1, max_days + 1):
             row = stock_data.iloc[i]
-            pct = round((row['close'] - base_close)/base_close*100, 2)
-            rates.append(pct)
-            # print(f"第{i}天 {row.name[0]} 收盘价：{row['close']} 收益率：{pct}%")
-            
+            current_close = row['close']
+
+            # 检查当前收盘价是否有效
+            if pd.isna(current_close):
+                rates.append(None)
+                continue
+
+            # 安全计算收益率
+            try:
+                pct = round((current_close - base_close) / base_close * 100, 2)
+                rates.append(pct)
+            except (ZeroDivisionError, FloatingPointError):
+                rates.append(None)
+                print(f"计算错误: 股票 {stock_data.iloc[0]['code']} 第{i}天 基准价={base_close} 当前价={current_close}")
+
         # 补足剩余天数
-        rates += [None]*(100 - len(rates))
+        rates += [None] * (100 - len(rates))
         return rates[:100]
-        
+
     except Exception as e:
         logging.error(f"数据索引超出范围,收益率计算失败 {stock[2]}: {str(e)}")
-        return [None]*100
+        return [None] * 100
 
 
 def check_table_exists(table_name):
@@ -339,7 +379,7 @@ def create_table(table):
     try:
         conn = mysql.connector.connect(**db_config)
         cursor = conn.cursor()
-        
+
         columns = []
         for col_name, col_def in table['columns'].items():
             col_type = {
@@ -350,7 +390,7 @@ def create_table(table):
                 VARCHAR(20): "VARCHAR(20)"
             }[col_def['type']]
             columns.append(f"{col_name} {col_type}")
-        
+
         create_sql = f"""
             CREATE TABLE {table['name']} (
                 id INT AUTO_INCREMENT PRIMARY KEY,

@@ -30,7 +30,8 @@ import threeday_indicators as threeday_indicators
 import market_sentiment_a as market_sentiment_a
 import industry_data as industry_data
 import industry_sentiment_a as industry_sentiment_a
-import indicators_strategy_buy as indicators_strategy_buy
+import strategy_stock_buy as strategy_stock_buy
+import strategy_stock_sell as strategy_stock_sell
 import buy_20250425 as buy_20250425
 import basic_data as basic_data
 
@@ -49,6 +50,7 @@ import basic_info_stock as basic_info_stock
 import kline_stock as kline_stock
 import kline_index as kline_index
 import kline_etf as kline_etf
+import kline_industry as kline_industry
 
 
 
@@ -262,6 +264,8 @@ def main():
     kline_index.main()
     # 写入K线基金数据
     kline_etf.main()
+    # 写入K线基金数据
+    kline_industry.main()
 
 
     indicators_data_daily.main()
@@ -270,11 +274,12 @@ def main():
 
     market_sentiment_a.main()
 
-    industry_data.main()
+    # industry_data.main()
 
     industry_sentiment_a.main()
 
-    indicators_strategy_buy.main()
+    strategy_stock_buy.main()
+    strategy_stock_sell.main()
 
     buy_20250425.main()
 

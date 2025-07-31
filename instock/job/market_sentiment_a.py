@@ -34,7 +34,8 @@ def get_market_sentiment_data():
         sql = f"""
         WITH `date_range` AS (
           SELECT DISTINCT
-            `index_3day_indicators`.`date_int` AS `date_int`
+            `index_3day_indicators`.`date_int` AS `date_int`,
+            `index_3day_indicators`.`date` AS `date`
           FROM
             `index_3day_indicators`
           WHERE
@@ -124,6 +125,7 @@ def get_market_sentiment_data():
         ),
         `final_result` AS (
           SELECT
+            `dr`.`date` AS `date`,
             `dr`.`date_int` AS `date_int`,
             COALESCE(`us`.`指数上涨情绪`, 0) AS `指数上涨情绪`,
             COALESCE(`ds`.`指数下跌情绪`, 0) AS `指数下跌情绪`,
@@ -251,6 +253,7 @@ def get_market_sentiment_data():
               LEFT JOIN `signals` `s` ON ((`dr`.`date_int` = `s`.`date_int`))
             )
         ) SELECT
+          `final_result`.`date` AS `date`,
           `final_result`.`date_int` AS `date_int`,
           `final_result`.`指数上涨情绪` AS `指数上涨情绪`,
           `final_result`.`指数下跌情绪` AS `指数下跌情绪`,

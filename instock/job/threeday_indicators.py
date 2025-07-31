@@ -4,6 +4,7 @@
 # 在项目运行时，临时将项目路径添加到环境变量
 import os.path
 import sys
+
 cpath_current = os.path.dirname(os.path.dirname(__file__))
 cpath = os.path.abspath(os.path.join(cpath_current, os.pardir))
 sys.path.append(cpath)
@@ -14,7 +15,7 @@ import requests
 import numpy as np
 import pandas as pd
 import time
-import datetime 
+import datetime
 import mysql.connector
 import instock.core.tablestructure as tbs
 import instock.lib.database as mdb
@@ -25,7 +26,7 @@ from typing import List, Dict
 from sqlalchemy import DATE, VARCHAR, FLOAT, BIGINT, SmallInteger, DATETIME, INT
 from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_completed
 from tqdm import tqdm
-from instock.lib.database import db_host, db_user, db_password, db_database, db_charset 
+from instock.lib.database import db_host, db_user, db_password, db_database, db_charset
 
 
 class DBManager:
@@ -38,7 +39,8 @@ class DBManager:
                 user=db_user,
                 password=db_password,
                 database=db_database,
-                charset=db_charset
+                charset=db_charset,
+                use_pure=True  # 强制使用纯Python实现
             )
             return connection
         except Error as e:
@@ -80,147 +82,58 @@ class DBManager:
         return False
 
 
-def create_table_if_not_exists(table_name):
-    # 创建表（不含索引）
-    create_table_sql = f"""
-        CREATE TABLE IF NOT EXISTS `{table_name}` (
-            `id` INT AUTO_INCREMENT PRIMARY KEY,
-            `date` DATE,
-            `date_int` INT,
-            `code_int` INT,
-            `code` VARCHAR(6),
-            `name` VARCHAR(20)
-        );
-    """
-    DBManager.execute_sql(create_table_sql)
+def create_temp_table(source_table: str, temp_table: str):
+    """创建临时表并填充最近五个交易日的数据"""
+    # 删除旧临时表
+    DBManager.execute_sql(f"DROP TABLE IF EXISTS `{temp_table}`")
 
-    # 检查并添加id列（如果不存在）
+    # 获取最近五个交易日
     conn = DBManager.get_new_connection()
-    if conn:
-        try:
-            cursor = conn.cursor()
-            # 检查id列是否存在
-            check_sql = f"""
-                SELECT COUNT(*)
-                FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_SCHEMA = DATABASE()
-                  AND TABLE_NAME = '{table_name}'
-                  AND COLUMN_NAME = 'id';
-            """
-            cursor.execute(check_sql)
-            count = cursor.fetchone()[0]
-            if count == 0:
-                # 添加id列
-                alter_sql = f"""
-                    ALTER TABLE `{table_name}`
-                    ADD COLUMN `id` INT AUTO_INCREMENT PRIMARY KEY FIRST;
-                """
-                cursor.execute(alter_sql)
-                conn.commit()
-                print(f"表 {table_name} 成功添加 id 列")
-        except Error as e:
-            print(f"检查或添加 id 列失败: {e}")
-            conn.rollback()
-        finally:
-            if conn.is_connected():
-                cursor.close()
-                conn.close()
+    try:
+        cursor = conn.cursor()
+        # 获取最近的五个交易日日期
+        cursor.execute(f"""
+            SELECT DISTINCT date_int 
+            FROM `{source_table}` 
+            ORDER BY date_int DESC 
+            LIMIT 5
+        """)
+        recent_dates = [str(row[0]) for row in cursor.fetchall()]
 
-    # 创建索引（修复 Unread result found 问题）
-    def create_index(index_name, columns, is_unique=False):
-        conn = DBManager.get_new_connection()
-        try:
-            cursor = conn.cursor()
-            # 检查索引是否存在
-            check_sql = f"""
-                SELECT COUNT(*)
-                FROM information_schema.STATISTICS
-                WHERE table_name = '{table_name}'
-                  AND index_name = '{index_name}';
-            """
-            cursor.execute(check_sql)
-            result = cursor.fetchall()  # 强制读取结果
-            if result[0][0] == 0:
-                index_type = "UNIQUE" if is_unique else ""
-                create_sql = f"""
-                    CREATE {index_type} INDEX `{index_name}`
-                    ON `{table_name}` ({', '.join(columns)});
-                """
-                cursor.execute(create_sql)
-                conn.commit()
-        except Error as e:
-            print(f"创建索引 {index_name} 失败: {e}")
-            conn.rollback()
-        finally:
-            if conn.is_connected():
-                cursor.close()
-                conn.close()
+        if not recent_dates:
+            print(f"源表 {source_table} 中没有找到交易日数据")
+            return
 
-    # if not DBManager.table_exists(table_name):
-    #     # 只有当表不存在时才创建索引
-    #     create_index("idx_date_code_int", ["date_int", "code_int"], is_unique=True)
-    #     create_index("idx_code_int", ["code_int"])
-    #     create_index("idx_date_int", ["date_int"])
+        date_condition = ", ".join(recent_dates)
 
+        # 创建临时表并填充数据
+        create_sql = f"""
+            CREATE TABLE `{temp_table}` AS
+            SELECT * 
+            FROM `{source_table}`
+            WHERE date_int IN ({date_condition})
+        """
+        cursor.execute(create_sql)
+        conn.commit()
+        print(f"成功创建临时表 {temp_table}，包含 {len(recent_dates)} 个交易日的数据")
 
-def sql语句生成器(table_name, data, batch_size=500):
+        # 为临时表创建索引
+        index_sql = f"""
+            CREATE INDEX idx_{temp_table}_date_int ON `{temp_table}` (date_int);
+            CREATE INDEX idx_{temp_table}_code_int ON `{temp_table}` (code_int);
+        """
+        for stmt in index_sql.split(";"):
+            if stmt.strip():
+                cursor.execute(stmt)
+        conn.commit()
 
-    # 预处理code_int字段
-    if 'code' in data.columns and 'code_int' not in data.columns:
-        data.insert(0, 'code_int', data['code'].astype(int))
-
-    # 增加数据排序    
-    data = data.sort_values(by=['code_int', 'date_int'])
-
-    # SQL模板（批量版本）
-    sql_template = """INSERT INTO `{table_name}` ({columns}) 
-        VALUES {values}
-        ON DUPLICATE KEY UPDATE {update_clause};"""
-
-    # 定义字段和更新子句
-    columns = ', '.join([f"`{col}`" for col in data.columns])
-    unique_keys = ['date_int', 'code_int']
-    update_clause = ', '.join(
-        [f"`{col}`=VALUES(`{col}`)" 
-         for col in data.columns if col not in unique_keys]
-    )
-
-    # 分批次处理数据
-    batches = []
-    for i in range(0, len(data), batch_size):
-        batch = data.iloc[i:i+batch_size]
-        value_rows = []
-
-        for row in batch.itertuples(index=False):
-            values = []
-            for item in row:
-                # 处理空值和特殊字符
-                if pd.isna(item) or item in ['-', '']:
-                    values.append("NULL")
-                elif isinstance(item, (datetime.date, datetime.datetime)):
-                    values.append(f"'{item.strftime('%Y-%m-%d')}'")
-                elif isinstance(item, (int, float)):
-                    values.append(str(item))
-                else:
-                    cleaned = str(item).replace("'", "''").replace("\\", "\\\\")
-                    values.append(f"'{cleaned}'")
-            value_rows.append(f"({', '.join(values)})")
-
-        # 合并为单个VALUES子句
-        values_str = ',\n'.join(value_rows)
-        batches.append(
-            sql_template.format(
-                table_name=table_name,
-                columns=columns,
-                values=values_str,
-                update_clause=update_clause
-            )
-        )
-    
-    return batches
-
-
-
+    except Error as e:
+        print(f"创建临时表 {temp_table} 失败: {e}")
+        conn.rollback()
+    finally:
+        if conn and conn.is_connected():
+            cursor.close()
+            conn.close()
 
 
 def process_3day_data(source_table: str, target_table: str, sample_code: int):
@@ -245,10 +158,12 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
         join_clause = "JOIN kline_etf hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int"
     elif "index" in source_table:
         join_clause = "JOIN kline_index hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int"
+    elif "industry" in source_table:
+        join_clause = "JOIN kline_industry hist ON hist.code_int = t.code_int AND hist.date_int = t.date_int"
 
     # 根据源表类型选择字段
-    industry_field = "s.`东方财富网行业 AS industry`," if "stock" in source_table else "NULL AS industry,"
-    
+    industry_field = "s.`东方财富网行业` AS industry," if "stock" in source_table else "NULL AS industry,"
+
     # 第二步：执行分析查询
     query = f"""
     WITH LatestDate AS (
@@ -278,24 +193,21 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
             LAG(t.wr_6, 2) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS wr_6_day2,
             t.wr_10,
             LAG(t.wr_10, 1) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS wr_10_day1,
-            LAG(t.wr_10, 2) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS wr_10_day2,
+            LAG(t.wr_10, 2) OVER (PARTition BY t.code_int ORDER BY t.date_int) AS wr_10_day2,
             t.rsi_6,
             LAG(t.rsi_6, 1) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS rsi_6_day1,
             LAG(t.rsi_6, 2) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS rsi_6_day2,
             t.rsi_12,
-            LAG(t.rsi_12, 1) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS rsi_12_day1,
+            LAG(t.rsi_12, 1) OVER (PARTition BY t.code_int ORDER BY t.date_int) AS rsi_12_day1,
             LAG(t.rsi_12, 2) OVER (PARTition BY t.code_int ORDER BY t.date_int) AS rsi_12_day2,
             t.cci,
-            LAG(t.cci, 1) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS cci_day1,
-            LAG(t.cci, 2) OVER (PARTITION BY t.code_int ORDER BY t.date_int) AS cci_day2,
+            LAG(t.cci, 1) OVER (PARTition BY t.code_int ORDER BY t.date_int) AS cci_day1,
+            LAG(t.cci, 2) OVER (PARTition BY t.code_int ORDER BY t.date_int) AS cci_day2,
             {industry_field}
             hist.turnoverrate AS turnover
         FROM {source_table} t
         {join_clause}
-        WHERE t.date BETWEEN
-          (SELECT DATE_SUB(last_date, INTERVAL 10 DAY) FROM LatestDate) -- ✅ 起始日期 = last_date - 20天
-          AND
-          (SELECT last_date FROM LatestDate) -- ✅ 结束日期 = last_date
+        WHERE t.date_int >= (SELECT MIN(date_int) FROM {source_table})
     )
     SELECT * FROM 3day
     WHERE kdjk_day2 IS NOT NULL
@@ -307,13 +219,13 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
       AND rsi_12_day2 IS NOT NULL
       AND cci_day2 IS NOT NULL;
     """
-    
+
     # 执行查询并获取数据
     conn = DBManager.get_new_connection()
     try:
         df = pd.read_sql(query, conn)
         print(f"从 {source_table} 获取到 {len(df)} 条三日指标数据")
-        
+
         if not df.empty:
             # 第三步：写入目标表
             sql_batches = sql语句生成器(target_table, df)
@@ -330,14 +242,15 @@ def process_3day_data(source_table: str, target_table: str, sample_code: int):
         if conn and conn.is_connected():
             conn.close()
 
+
 def create_3day_table(table_name: str):
     """创建三日指标表结构"""
     columns = [
         ('id', 'INT AUTO_INCREMENT PRIMARY KEY'),
-        ('date', 'DATE'), ('date_int', 'INT'), 
-        ('code_int', 'INT'), ('code', 'VARCHAR(6)'), 
-        ('name', 'VARCHAR(20)'),('close', 'FLOAT'), 
-        ('turnover', 'FLOAT'), ('industry', 'VARCHAR(20)'), 
+        ('date', 'DATE'), ('date_int', 'INT'),
+        ('code_int', 'INT'), ('code', 'VARCHAR(6)'),
+        ('name', 'VARCHAR(20)'), ('close', 'FLOAT'),
+        ('turnover', 'FLOAT'), ('industry', 'VARCHAR(20)'),
         ('kdjk', 'FLOAT'), ('kdjk_day1', 'FLOAT'), ('kdjk_day2', 'FLOAT'),
         ('kdjd', 'FLOAT'), ('kdjd_day1', 'FLOAT'), ('kdjd_day2', 'FLOAT'),
         ('kdjj', 'FLOAT'), ('kdjj_day1', 'FLOAT'), ('kdjj_day2', 'FLOAT'),
@@ -347,23 +260,23 @@ def create_3day_table(table_name: str):
         ('rsi_12', 'FLOAT'), ('rsi_12_day1', 'FLOAT'), ('rsi_12_day2', 'FLOAT'),
         ('cci', 'FLOAT'), ('cci_day1', 'FLOAT'), ('cci_day2', 'FLOAT')
     ]
-    
+
     # 创建表
     create_sql = f"CREATE TABLE IF NOT EXISTS {table_name} (\n"
     create_sql += ",\n".join([f"`{col[0]}` {col[1]}" for col in columns])
     create_sql += "\n) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;"
-    
+
     DBManager.execute_sql(create_sql)
-    
+
     if not DBManager.table_exists(table_name):
         # 创建索引
         index_sql = f"""
         CREATE UNIQUE INDEX idx_{table_name}_date_code_int 
         ON {table_name} (date_int, code_int);
-        
+
         CREATE INDEX idx_{table_name}_code_int 
         ON {table_name} (code_int);
-        
+
         CREATE INDEX idx_{table_name}_date_int 
         ON {table_name} (date_int);
         """
@@ -372,214 +285,108 @@ def create_3day_table(table_name: str):
                 DBManager.execute_sql(statement)
 
 
+def sql语句生成器(table_name, data, batch_size=5000):
+    # 预处理code_int字段
+    if 'code' in data.columns and 'code_int' not in data.columns:
+        data.insert(0, 'code_int', data['code'].astype(int))
+
+    # 增加数据排序
+    data = data.sort_values(by=['code_int', 'date_int'])
+
+    # SQL模板（批量版本）
+    sql_template = """INSERT INTO `{table_name}` ({columns}) 
+        VALUES {values}
+        ON DUPLICATE KEY UPDATE {update_clause};"""
+
+    # 定义字段和更新子句
+    columns = ', '.join([f"`{col}`" for col in data.columns])
+    unique_keys = ['date_int', 'code_int']
+    update_clause = ', '.join(
+        [f"`{col}`=VALUES(`{col}`)"
+         for col in data.columns if col not in unique_keys]
+    )
+
+    # 分批次处理数据
+    batches = []
+    for i in range(0, len(data), batch_size):
+        batch = data.iloc[i:i + batch_size]
+        value_rows = []
+
+        for row in batch.itertuples(index=False):
+            values = []
+            for item in row:
+                # 处理空值和特殊字符
+                if pd.isna(item) or item in ['-', '']:
+                    values.append("NULL")
+                elif isinstance(item, (datetime.date, datetime.datetime)):
+                    values.append(f"'{item.strftime('%Y-%m-%d')}'")
+                elif isinstance(item, (int, float)):
+                    values.append(str(item))
+                else:
+                    cleaned = str(item).replace("'", "''").replace("\\", "\\\\")
+                    values.append(f"'{cleaned}'")
+            value_rows.append(f"({', '.join(values)})")
+
+        # 合并为单个VALUES子句
+        values_str = ',\n'.join(value_rows)
+        batches.append(
+            sql_template.format(
+                table_name=table_name,
+                columns=columns,
+                values=values_str,
+                update_clause=update_clause
+            )
+        )
+
+    return batches
+
+
 def main():
     # 时区设置
     tz = pytz.timezone('Asia/Shanghai')
     pd.Timestamp.now(tz).strftime('%Y-%m-%d %H:%M:%S %Z%z')
     start_time = time.time()
+
+    # 定义源表和目标表映射
+    table_mappings = [
+        ("cn_stock_indicators", "temp_stock_indicators", "stock_3day_indicators", 1),
+        ("cn_etf_indicators", "temp_etf_indicators", "etf_3day_indicators", 159001),
+        ("cn_index_indicators", "temp_index_indicators", "index_3day_indicators", 1),
+        ("cn_industry_indicators", "temp_industry_indicators", "industry_3day_indicators", 447)
+    ]
+
     try:
-        # 并行处理三类数据
-        with ProcessPoolExecutor(max_workers=3) as executor:
-            # 股票三日指标
-            executor.submit(process_3day_data, 
-                           'cn_stock_indicators', 
-                           'stock_3day_indicators',
-                           1)  # 示例代码000001
-            
-            # ETF三日指标
-            executor.submit(process_3day_data,
-                           'cn_etf_indicators',
-                           'etf_3day_indicators',
-                           159001)  # 示例代码159001
-            
-            # 指数三日指标
-            executor.submit(process_3day_data,
-                           'cn_index_indicators',
-                           'index_3day_indicators',
-                           1)  # 示例代码000001
-        
+        # 第一步：创建临时表
+        for source_table, temp_table, _, _ in table_mappings:
+            print(f"⏳ 正在创建临时表 {temp_table}...")
+            create_temp_table(source_table, temp_table)
+
+        # 第二步：并行处理三类数据
+        with ProcessPoolExecutor(max_workers=4) as executor:
+            futures = []
+            for source_table, temp_table, target_table, sample_code in table_mappings:
+                futures.append(
+                    executor.submit(process_3day_data,
+                                    temp_table,
+                                    target_table,
+                                    sample_code)
+                )
+
+            # 等待所有任务完成
+            for future in tqdm(as_completed(futures), total=len(futures), desc="处理进度"):
+                try:
+                    future.result()
+                except Exception as e:
+                    print(f"处理过程中发生错误: {e}")
+
+        # 第三步：清理临时表
+        for _, temp_table, _, _ in table_mappings:
+            print(f"🧹 清理临时表 {temp_table}...")
+            DBManager.execute_sql(f"DROP TABLE IF EXISTS `{temp_table}`")
+
     finally:
-        print(f"\n🕒 三日指标，总耗时: {time.time()-start_time:.2f}秒")  # 确保异常时也输出
+        print(f"\n🕒 三日指标，总耗时: {time.time() - start_time:.2f}秒")
+
 
 if __name__ == "__main__":
     main()
-
-
-
-# /*股票三日指标数据分析,储到stock_3day_indicators,*/
-# -- 定义 CTE 获取最新日期
-# WITH LatestDate AS (
-#     SELECT MAX(date_int) AS last_date 
-#     FROM cn_stock_indicators 
-#     WHERE code_int = 1
-# ),
-# 3day AS (
-#     SELECT
-#         id,
-#         code_int,
-#         date_int,
-#         code,
-#         date,
-#         name,
-#         kdjk,
-#         -- 获取前 1 日的 kdjk 值（按股票代码分组，按日期排序）
-#         LAG(`kdjk`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjk_day1,
-#         -- 获取前 2 日的 kdjk 值（按股票代码分组，按日期排序）
-#         LAG(`kdjk`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjk_day2,
-#         kdjd,
-#         -- 获取前 1 日的 kdjd 值（按股票代码分组，按日期排序）
-#         LAG(`kdjd`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjd_day1,
-#         -- 获取前 2 日的 kdjd 值（按股票代码分组，按日期排序）
-#         LAG(`kdjd`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjd_day2,
-#         kdjj,
-#         -- 获取前 1 日的 kdjj 值（按股票代码分组，按日期排序）
-#         LAG(`kdjj`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjj_day1,
-#         -- 获取前 2 日的 kdjj 值（按股票代码分组，按日期排序）
-#         LAG(`kdjj`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjj_day2,
-#         wr_6,
-#         -- 获取前 1 日的 wr_6 值（按股票代码分组，按日期排序）
-#         LAG(`wr_6`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS wr_6_day1,
-#         -- 获取前 2 日的 wr_6 值（按股票代码分组，按日期排序）
-#         LAG(`wr_6`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS wr_6_day2,
-#         cci,
-#         -- 获取前 1 日的 cci 值（按股票代码分组，按日期排序）
-#         LAG(`cci`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS cci_day1,
-#         -- 获取前 2 日的 cci 值（按股票代码分组，按日期排序）
-#         LAG(`cci`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS cci_day2
-#     FROM
-#         cn_stock_indicators 
-#     -- 筛选日期范围
-#     WHERE
-#         date_int BETWEEN (SELECT last_date - 10 FROM LatestDate) AND (SELECT last_date FROM LatestDate)
-# )
-# SELECT *
-# FROM 3day
-# WHERE
-#     -- 排除字段中有 NULL 的行
-#     kdjk_day2 IS NOT NULL
-#     AND kdjd_day2 IS NOT NULL
-#     AND kdjj_day2 IS NOT NULL
-#     AND wr_6_day2 IS NOT NULL
-#     AND cci_day2 IS NOT NULL;
-    
-
-
-
-# /*ETF三日指标数据分析，存储到etf_3day_indicators*/
-# -- 定义 CTE 获取最新日期
-# WITH LatestDate AS (
-#     SELECT MAX(date_int) AS last_date 
-#     FROM cn_etf_indicators 
-#     WHERE code_int = 159001
-# ),
-# 3day AS (
-#     SELECT
-#         id,
-#         code_int,
-#         date_int,
-#         code,
-#         date,
-#         name,
-#         kdjk,
-#         -- 获取前 1 日的 kdjk 值（按股票代码分组，按日期排序）
-#         LAG(`kdjk`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjk_day1,
-#         -- 获取前 2 日的 kdjk 值（按股票代码分组，按日期排序）
-#         LAG(`kdjk`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjk_day2,
-#         kdjd,
-#         -- 获取前 1 日的 kdjd 值（按股票代码分组，按日期排序）
-#         LAG(`kdjd`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjd_day1,
-#         -- 获取前 2 日的 kdjd 值（按股票代码分组，按日期排序）
-#         LAG(`kdjd`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjd_day2,
-#         kdjj,
-#         -- 获取前 1 日的 kdjj 值（按股票代码分组，按日期排序）
-#         LAG(`kdjj`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjj_day1,
-#         -- 获取前 2 日的 kdjj 值（按股票代码分组，按日期排序）
-#         LAG(`kdjj`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjj_day2,
-#         wr_6,
-#         -- 获取前 1 日的 wr_6 值（按股票代码分组，按日期排序）
-#         LAG(`wr_6`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS wr_6_day1,
-#         -- 获取前 2 日的 wr_6 值（按股票代码分组，按日期排序）
-#         LAG(`wr_6`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS wr_6_day2,
-#         cci,
-#         -- 获取前 1 日的 cci 值（按股票代码分组，按日期排序）
-#         LAG(`cci`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS cci_day1,
-#         -- 获取前 2 日的 cci 值（按股票代码分组，按日期排序）
-#         LAG(`cci`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS cci_day2
-#     FROM
-#         cn_etf_indicators 
-#     -- 筛选日期范围
-#     WHERE
-#         date_int BETWEEN (SELECT last_date - 10 FROM LatestDate) AND (SELECT last_date FROM LatestDate)
-# )
-# SELECT *
-# FROM 3day
-# WHERE
-#     -- 排除字段中有 NULL 的行
-#     kdjk_day2 IS NOT NULL
-#     AND kdjd_day2 IS NOT NULL
-#     AND kdjj_day2 IS NOT NULL
-#     AND wr_6_day2 IS NOT NULL
-#     AND cci_day2 IS NOT NULL;
-
-
-
-
-
-
-# /*指数三日指标数据分析，存储到index_3day_indicators*/
-# -- 定义 CTE 获取最新日期
-# WITH LatestDate AS (
-#     SELECT MAX(date_int) AS last_date 
-#     FROM cn_index_indicators 
-#     WHERE code_int = 1
-# ),
-# 3day AS (
-#     SELECT
-#         id,
-#         code_int,
-#         date_int,
-#         code,
-#         date,
-#         name,
-#         kdjk,
-#         -- 获取前 1 日的 kdjk 值（按股票代码分组，按日期排序）
-#         LAG(`kdjk`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjk_day1,
-#         -- 获取前 2 日的 kdjk 值（按股票代码分组，按日期排序）
-#         LAG(`kdjk`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjk_day2,
-#         kdjd,
-#         -- 获取前 1 日的 kdjd 值（按股票代码分组，按日期排序）
-#         LAG(`kdjd`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjd_day1,
-#         -- 获取前 2 日的 kdjd 值（按股票代码分组，按日期排序）
-#         LAG(`kdjd`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjd_day2,
-#         kdjj,
-#         -- 获取前 1 日的 kdjj 值（按股票代码分组，按日期排序）
-#         LAG(`kdjj`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjj_day1,
-#         -- 获取前 2 日的 kdjj 值（按股票代码分组，按日期排序）
-#         LAG(`kdjj`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS kdjj_day2,
-#         wr_6,
-#         -- 获取前 1 日的 wr_6 值（按股票代码分组，按日期排序）
-#         LAG(`wr_6`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS wr_6_day1,
-#         -- 获取前 2 日的 wr_6 值（按股票代码分组，按日期排序）
-#         LAG(`wr_6`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS wr_6_day2,
-#         cci,
-#         -- 获取前 1 日的 cci 值（按股票代码分组，按日期排序）
-#         LAG(`cci`, 1) OVER (PARTITION BY code_int ORDER BY date_int) AS cci_day1,
-#         -- 获取前 2 日的 cci 值（按股票代码分组，按日期排序）
-#         LAG(`cci`, 2) OVER (PARTITION BY code_int ORDER BY date_int) AS cci_day2
-#     FROM
-#         cn_index_indicators 
-#     -- 筛选日期范围
-#     WHERE
-#         date_int BETWEEN (SELECT last_date - 10 FROM LatestDate) AND (SELECT last_date FROM LatestDate)
-# )
-# SELECT *
-# FROM 3day
-# WHERE
-#     -- 排除字段中有 NULL 的行
-#     kdjk_day2 IS NOT NULL
-#     AND kdjd_day2 IS NOT NULL
-#     AND kdjj_day2 IS NOT NULL
-#     AND wr_6_day2 IS NOT NULL
-#     AND cci_day2 IS NOT NULL;
-
-

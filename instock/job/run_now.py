@@ -31,7 +31,7 @@ import threeday_indicators as threeday_indicators
 import market_sentiment_a as market_sentiment_a
 import industry_data as industry_data
 import industry_sentiment_a as industry_sentiment_a
-import indicators_strategy_buy as indicators_strategy_buy
+import strategy_stock_buy as indicators_strategy_buy
 import buy_20250425 as buy_20250425
 import basic_data as basic_data
 import realtime_indicators as indicators_now

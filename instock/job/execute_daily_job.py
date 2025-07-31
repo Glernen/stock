@@ -18,24 +18,18 @@ if not os.path.exists(log_path):
     os.makedirs(log_path)
 logging.basicConfig(format='%(asctime)s %(message)s', filename=os.path.join(log_path, 'stock_execute_job.log'))
 logging.getLogger().setLevel(logging.INFO)
-import init_job as bj
-import basic_data_daily_job as hdj
-import basic_data_other_daily_job as hdtj
-import basic_data_after_close_daily_job as acdj
-import indicators_data_daily_job as gdj
-import strategy_data_daily_job as sdj
+
 import backtest_data_daily_job as backtest_data_daily_job
-import klinepattern_data_daily_job as kdj
-import selection_data_daily_job as sddj
-import basic_data as basic_data
-import basic_hist_data as basic_hist_data
+
 import indicators_data_daily as indicators_data_daily
-import threeday_indicators  as threeday_indicators
-import indicators_strategy_buy as indicators_strategy_buy
+import threeday_indicators as threeday_indicators
+
 import market_sentiment_a as market_sentiment_a
 import industry_data as industry_data
 import industry_sentiment_a as industry_sentiment_a
 import strategy_etf_buy as strategy_etf_buy
+
+import strategy_stock_buy as strategy_stock_buy
 import strategy_stock_buy_optimization as strategy_stock_buy_optimization
 import strategy_stock_sell as strategy_stock_sell
 
@@ -53,6 +47,12 @@ import basic_info_stock as basic_info_stock
 import kline_stock as kline_stock
 import kline_index as kline_index
 import kline_etf as kline_etf
+import kline_industry as kline_industry
+
+import pattern_stock as pattern_stock
+import pattern_etf as pattern_etf
+import pattern_index as pattern_index
+import pattern_industry as pattern_industry
 
 import histdata as histdata
 
@@ -92,7 +92,14 @@ def main():
     kline_index.main()
     # 写入K线基金数据
     kline_etf.main()
+    # 写入K线行业数据
+    kline_industry.main()
 
+    # K线图标
+    pattern_stock.main()
+    pattern_etf.main()
+    pattern_index.main()
+    pattern_industry.main()
 
     # 通过数据基础表，获取历史数据表中个股数据，计算所有股票、基金、指数的日行情指标，并同时创建和写入日行情指标主表
     indicators_data_daily.main()
@@ -110,7 +117,7 @@ def main():
     industry_sentiment_a.main()
     
     # 买入策略
-    indicators_strategy_buy.main()
+    strategy_stock_buy.main()
     # 买入策略精选
     strategy_stock_buy_optimization.main()
 
@@ -123,8 +130,6 @@ def main():
     # # # # 第6步创建股票回测
     backtest_data_daily_job.main()
 
-    # # # # 第7步创建股票闭盘后才有的数据
-    acdj.main()
 
     histdata.main()
 

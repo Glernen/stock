@@ -166,15 +166,15 @@ def get_tencent_all_industries(board_type='hy'):
 
 # 获取沪市A股+深市A股实时股票数据数据并写入数据库
 
-def stock_zh_a_spot_em() -> pd.DataFrame:
+def industry_zh_a_spot_em() -> pd.DataFrame:
     '''
-    东方财富网-沪深京 A 股-实时行情
-    https://quote.eastmoney.com/center/gridlist.html#hs_a_board
-    :return: 实时行情
+    东方财富网-沪深京 A 股-行业实时行情
+    https://quote.eastmoney.com/center/gridlist.html#industry_board
+    :return: 行业实时行情
     :rtype: pandas.DataFrame
     '''
     start_time = time.time()
-    print("开始获取东方财富实时股票数据...")
+    print("开始获取东方财富实时行业数据...")
 
     page_size = 100
     url = "http://82.push2.eastmoney.com/api/qt/clist/get"
@@ -188,8 +188,8 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
         "fltt": "2",
         "invt": "2",
         "fid": "f3",
-        "fs": "m:0 t:6,m:0 t:80,m:1 t:2,m:1 t:23,m:0 t:81 s:2048",
-        "fields": "f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f20,f21,f22,f23,f24,f25,f26,f37,f38,f39,f40,f41,f45,f46,f48,f49,f57,f61,f100,f112,f113,f114,f115,f221",
+        "fs": "m:90+t:2+f:!50",
+        "fields": "f2,f3,f4,f5,f6,f7,f8,f9,f10,f11,f12,f13,f14,f15,f16,f17,f18,f20,f21,f22,f24,f25,f26,f38,f39,f152,f104,f105,f106,f128,f140,f141,f207,f208,f209,f136,f222",
         "_": str(int(time.time() * 1000)),
     }
 
@@ -240,16 +240,15 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
 
         # 定义数值列清单
         numeric_cols = [
-            'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f13',
-            'f15', 'f16', 'f17', 'f18', 'f20', 'f21', 'f22', 'f23', 'f24', 'f25',
-            'f37', 'f38', 'f39', 'f40', 'f41', 'f45', 'f46', 'f48', 'f49', 'f57', 'f61',
-            'f112', 'f113', 'f114', 'f115'
+            'f2','f3','f4','f5','f6','f7','f8','f9','f10','f11',
+            'f15','f16','f17','f18','f20','f21','f22','f24','f25',
+            'f38','f39','f104','f105','f106','f141', 'f136', 'f209','f222',
         ]
 
         # 执行类型转换
         temp_df[numeric_cols] = temp_df[numeric_cols].apply(pd.to_numeric, errors='coerce')
 
-        date_cols = ["f26", "f221"]
+        date_cols = ["f26"]
         temp_df[date_cols] = temp_df[date_cols].apply(lambda x: pd.to_datetime(x, format='%Y%m%d', errors="coerce"))
 
         # 获取上证交易所日历
@@ -272,12 +271,16 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
         #  流通市值：元 → 亿元 (除以100000000)
         temp_df['流通市值(亿元)'] = temp_df['f21'] / 100000000
 
-        # 准备东方财富实时股票数据
-        realtime_stock_df = pd.DataFrame({
+        # 提取后4位作为行业代码
+        temp_df["industry_code"] = temp_df["f12"].str[-4:]
+
+        # 准备东方财富行业实时数据
+        realtime_industry_df = pd.DataFrame({
             "date": temp_df["date"],
             "date_int": temp_df["date_int"],
-            "code": temp_df["f12"],
-            "code_int": temp_df["f12"].astype(int),
+            "code": temp_df["industry_code"],
+            "code_int": temp_df["industry_code"].astype(int),
+            "symbol": temp_df["f12"],
             "name": temp_df["f14"],
             "市场标识": temp_df["f13"],
             "开盘价": temp_df["f17"],
@@ -296,48 +299,41 @@ def stock_zh_a_spot_em() -> pd.DataFrame:
             "5分钟涨跌幅(%)": temp_df["f11"],
             "60日涨跌幅(%)": temp_df["f24"],
             "年初至今涨跌幅(%)": temp_df["f25"],
-            "动态市盈率": temp_df["f9"],
-            "市盈率TTM": temp_df["f115"],
-            "静态市盈率": temp_df["f114"],
-            "市净率": temp_df["f23"],
-            "每股收益": temp_df["f112"],
-            "每股净资产": temp_df["f113"],
-            "每股公积金": temp_df["f61"],
-            "每股未分配利润": temp_df["f48"],
-            "加权净资产收益率": temp_df["f37"],
-            "毛利率": temp_df["f49"],
-            "资产负债率": temp_df["f57"],
-            "营业收入": temp_df["f40"],
-            "营业收入同比增长": temp_df["f41"],
-            "归属净利润": temp_df["f45"],
-            "归属净利润同比增长": temp_df["f46"],
-            "报告期": temp_df["f221"],
-            "总股本": temp_df["f38"],
             "已流通股份": temp_df["f39"],
             "总市值(亿元)": temp_df["总市值(亿元)"],
             "流通市值(亿元)": temp_df["流通市值(亿元)"],
-            "所处行业": temp_df["f100"],
-            "上市时间": temp_df["f26"]
+            "上市时间": temp_df["f26"],
+            "上涨家数": temp_df["f104"],
+            "下跌家数": temp_df["f105"],
+            "持平家数": temp_df["f106"],
+            "领涨股": temp_df["f128"],
+            "领涨股代码": temp_df["f140"],
+            "领涨股市场标识": temp_df["f141"],
+            "领涨股涨跌幅(%)": temp_df["f136"],
+            "领跌股": temp_df["f207"],
+            "领跌股代码":temp_df["f208"],
+            "领跌股市场标识": temp_df["f209"],
+            "领跌股涨跌幅(%)": temp_df["f222"]
         })
 
-        # print(realtime_stock_df.head())
+        # print(realtime_industry_df.head())
 
         # 生成批量SQL
         sql_batches = sql_batch_generator(
-            table_name='realtime_stock_df',
-            data=realtime_stock_df,
+            table_name='realtime_industry_df',
+            data=realtime_industry_df,
             batch_size=6000  # 根据实际情况调整
         )
 
         # 执行批量插入
         execute_batch_sql(sql_batches)
         print(
-            f"[Success] 东方财富股票实时数据写入完成，数据量：{len(realtime_stock_df)}，耗时 {time.time() - start_time:.2f}秒")
+            f"[Success] 东方财富行业实时数据写入完成，数据量：{len(realtime_industry_df)}，耗时 {time.time() - start_time:.2f}秒")
 
-        return realtime_stock_df
+        return realtime_industry_df
 
     except Exception as e:
-        print(f"东方财富股票实时数据处理失败: {e}")
+        print(f"东方财富行业实时数据处理失败: {e}")
 
 
 ########################################################################
@@ -458,8 +454,8 @@ def main():
         # 提交三个任务到进程池
         futures = [
             executor.submit(get_tencent_all_industries, 'hy'),  # 申万一级行业
-            executor.submit(get_tencent_all_industries, 'hy2')  # 申万二级行业
-            # executor.submit(get_tencent_all_stocks)
+            executor.submit(get_tencent_all_industries, 'hy2'),  # 申万二级行业
+            executor.submit(industry_zh_a_spot_em) # 东方财富网行业
         ]
 
         # 等待所有任务完成（可选添加进度条）
